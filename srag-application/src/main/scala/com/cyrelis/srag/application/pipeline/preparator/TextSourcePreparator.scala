@@ -6,7 +6,7 @@ import java.util.UUID
 import com.cyrelis.srag.application.errors.PipelineError
 import com.cyrelis.srag.application.ports.driven.storage.BlobStorePort
 import com.cyrelis.srag.domain.ingestionjob.IngestionJob
-import com.cyrelis.srag.domain.transcript.{IngestSource, Transcript}
+import com.cyrelis.srag.domain.transcript.{IngestSource, Transcript, Word}
 import zio.ZIO
 
 final class TextSourcePreparator(
@@ -22,11 +22,24 @@ final class TextSourcePreparator(
       textBytes  <- blobStore.fetchAudio(blobKey)
       textContent = new String(textBytes, StandardCharsets.UTF_8)
       _          <- ZIO.logDebug(s"Job ${job.id} - text content loaded: ${textContent.length} chars")
-      now        <- zio.Clock.instant
-      transcript  = Transcript(
+      words       = textContent
+                .split("\\s+")
+                .filter(_.nonEmpty)
+                .zipWithIndex
+                .map { case (wordText, idx) =>
+                  Word(
+                    text = wordText,
+                    start = idx.toLong,
+                    end = (idx + 1).toLong,
+                    confidence = 1.0
+                  )
+                }
+                .toList
+      now       <- zio.Clock.instant
+      transcript = Transcript(
                      id = UUID.randomUUID(),
                      language = None,
-                     text = textContent,
+                     words = words,
                      confidence = 1.0,
                      createdAt = now,
                      source = IngestSource.Text,
