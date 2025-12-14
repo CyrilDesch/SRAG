@@ -33,7 +33,7 @@ SRAG is designed with **Hexagonal Architecture** principles, making it easy to s
 - [x] Implement a Job Queue Adapter
 - [ ] Allow text and documents (pdf, docx, ...) ingestion
 - [ ] Implement Deep Document Understanding
-- [ ] Implement MCP server
+- [x] Implement MCP server
 - [ ] Implement image to text
 - [ ] Implement gRPC Gateway
 - [x] Implement Retry and Timeout Services
@@ -310,6 +310,34 @@ sbt coverage test coverageReport
 - **Architecture**: Hexagonal architecture principles and module structure (see Architecture section above)
 - **Configuration**: Declarative adapter configuration system (see Configuration section above)
 - **Cursor Rules**: `.cursor/rules/` - AI-assisted development guidelines
+
+### MCP Server for AI Assistants
+
+SRAG includes a Model Context Protocol (MCP) server for seamless integration with Claude and other AI assistants.
+
+**Quick Start:**
+
+1. Build the JAR:
+
+   ```bash
+   sbt 'srag-infrastructure/assembly'
+   ```
+
+2. Configure Claude to use SRAG:
+
+   ```json
+   {
+     "mcpServers": {
+       "srag": {
+         "command": "/path/to/SRAG/scripts/mcpServer.sh"
+       }
+     }
+   }
+   ```
+
+3. Start chatting with Claude - it can now ingest and query your documents!
+
+📖 **[Full MCP Server Documentation](docs/MCP_SERVER.md)**
 
 ## 🤝 Contributing
 
