@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- File appender for MCP mode - all logs go to file -->
+    <appender name="FILE" class="ch.qos.logback.core.FileAppender">
+        <file>/tmp/srag-mcp.log</file>
+        <append>true</append>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss} %highlight(%-5level) [%logger{36}] %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Root logger - everything to file -->
+    <root level="${LOG_LEVEL:-INFO}">
+        <appender-ref ref="FILE" />
+    </root>
+
+    <!-- Specific logger levels -->
+    <logger name="srag" level="${LOG_LEVEL:-INFO}" />
+    <logger name="com.cyrelis.srag" level="DEBUG" />
+    <logger name="io.getquill" level="WARN" />
+    <logger name="com.zaxxer.hikari" level="WARN" />
+    <logger name="org.flywaydb" level="INFO" />
+    <logger name="io.minio" level="WARN" />
+</configuration>

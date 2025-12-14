@@ -98,14 +98,15 @@ lazy val assemblySettings = {
   import sbtassembly.MergeStrategy
   Seq(
     assembly / assemblyMergeStrategy := {
-      case PathList("deriving.conf")                                  => MergeStrategy.concat
-      case PathList("scala", "annotation", "unroll.tasty")            => MergeStrategy.first
-      case PathList("scala", "annotation", "unroll.class")            => MergeStrategy.first
-      case PathList("module-info.class")                              => MergeStrategy.discard
-      case PathList("META-INF", "versions", "9", "module-info.class") => MergeStrategy.discard
-      case PathList("META-INF", "io.netty.versions.properties")       => MergeStrategy.first
-      case x if x.contains("io/getquill/")                            => MergeStrategy.first
-      case x                                                          =>
+      case PathList("deriving.conf")                                                           => MergeStrategy.concat
+      case PathList("scala", "annotation", "unroll.tasty")                                     => MergeStrategy.first
+      case PathList("scala", "annotation", "unroll.class")                                     => MergeStrategy.first
+      case PathList("module-info.class")                                                       => MergeStrategy.discard
+      case PathList("META-INF", "versions", "9", "module-info.class")                          => MergeStrategy.discard
+      case PathList("META-INF", "io.netty.versions.properties")                                => MergeStrategy.first
+      case PathList("META-INF", xs @ _*) if xs.lastOption.exists(_.endsWith(".kotlin_module")) => MergeStrategy.first
+      case x if x.contains("io/getquill/")                                                     => MergeStrategy.first
+      case x                                                                                   =>
         val oldStrategy = (assembly / assemblyMergeStrategy).value
         oldStrategy(x)
     },
