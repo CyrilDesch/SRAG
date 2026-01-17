@@ -1,7 +1,0 @@
-{
-  "mcpServers": {
-    "SRAG-metals": {
-      "url": "http://localhost:49843/sse"
-    }
-  }
-}
