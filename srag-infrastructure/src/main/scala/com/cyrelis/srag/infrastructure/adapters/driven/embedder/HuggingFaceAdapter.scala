@@ -11,7 +11,6 @@ import com.cyrelis.srag.domain.transcript.Transcript
 import com.cyrelis.srag.infrastructure.config.EmbedderAdapterConfig
 import com.cyrelis.srag.infrastructure.resilience.ErrorMapper
 import io.circe.Codec
-import io.circe.generic.semiauto.*
 import io.circe.parser.*
 import io.circe.syntax.*
 import sttp.client4.*
@@ -19,11 +18,7 @@ import sttp.client4.httpclient.zio.HttpClientZioBackend
 import sttp.model.MediaType
 import zio.*
 
-final case class HuggingFaceResponse(text: String, vector: List[Float], dim: Int)
-
-object HuggingFaceResponse {
-  given Codec[HuggingFaceResponse] = deriveCodec
-}
+final case class HuggingFaceResponse(text: String, vector: List[Float], dim: Int) derives Codec
 
 class HuggingFaceAdapter(config: EmbedderAdapterConfig.HuggingFace) extends EmbedderPort {
 

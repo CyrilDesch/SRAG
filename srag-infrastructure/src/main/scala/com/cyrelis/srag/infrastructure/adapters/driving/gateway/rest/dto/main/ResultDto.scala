@@ -2,16 +2,13 @@ package com.cyrelis.srag.infrastructure.adapters.driving.gateway.rest.dto.main
 
 import com.cyrelis.srag.domain.ingestionjob.IngestionJob
 import io.circe.Codec
-import io.circe.generic.semiauto.deriveCodec
 
 final case class JobAcceptedRestDto(
   jobId: String,
   status: String
-)
+) derives Codec
 
 object JobAcceptedRestDto {
-  given Codec[JobAcceptedRestDto] = deriveCodec
-
   def fromDomain(job: IngestionJob): JobAcceptedRestDto =
     JobAcceptedRestDto(
       jobId = job.id.toString,
@@ -30,11 +27,9 @@ final case class JobStatusRestDto(
   updatedAt: String,
   source: Option[String] = None,
   metadata: Option[Map[String, String]] = None
-)
+) derives Codec
 
 object JobStatusRestDto {
-  given Codec[JobStatusRestDto] = deriveCodec
-
   def fromDomain(job: IngestionJob): JobStatusRestDto =
     JobStatusRestDto(
       jobId = job.id.toString,

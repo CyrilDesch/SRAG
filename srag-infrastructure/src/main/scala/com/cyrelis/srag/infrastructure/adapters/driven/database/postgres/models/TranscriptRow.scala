@@ -3,7 +3,9 @@ package com.cyrelis.srag.infrastructure.adapters.driven.database.postgres.models
 import java.sql.Timestamp
 import java.util.UUID
 
-import com.cyrelis.srag.domain.transcript.{IngestSource, LanguageCode, Transcript}
+import com.cyrelis.srag.domain.transcript.{IngestSource, LanguageCode, Transcript, Word}
+import io.circe.Codec
+import io.circe.generic.semiauto.*
 import io.circe.parser.*
 import io.circe.syntax.*
 import io.getquill.JsonbValue
@@ -11,7 +13,7 @@ import io.getquill.JsonbValue
 final case class TranscriptRow(
   id: UUID,
   language: Option[String],
-  text: String,
+  words: JsonbValue[String],
   confidence: Double,
   createdAt: Timestamp,
   source: String,
@@ -19,15 +21,18 @@ final case class TranscriptRow(
 )
 
 object TranscriptRow:
+  given Codec[Word] = deriveCodec[Word]
+
   def fromTranscript(transcript: Transcript): TranscriptRow =
     val metadatasJson = transcript.metadata.asJson.noSpaces
+    val wordsJson     = transcript.words.asJson.noSpaces
     val source        = sourceToString(transcript.source)
     val createdTs     = Timestamp.from(transcript.createdAt)
 
     TranscriptRow(
       id = transcript.id,
       language = transcript.language.map(_.value),
-      text = transcript.text,
+      words = JsonbValue(wordsJson),
       confidence = transcript.confidence,
       createdAt = createdTs,
       source = source,
@@ -35,7 +40,12 @@ object TranscriptRow:
     )
 
   def toTranscript(row: TranscriptRow): Transcript =
-    val metadata  = decode[Map[String, String]](row.metadata.value).getOrElse(Map.empty)
+    val metadata = decode[Map[String, String]](row.metadata.value).getOrElse(
+      throw new RuntimeException(s"Failed to decode metadata JSON for transcript ${row.id}: ${row.metadata.value}")
+    )
+    val words = decode[List[Word]](row.words.value).getOrElse(
+      throw new RuntimeException(s"Failed to decode words JSON for transcript ${row.id}: ${row.words.value}")
+    )
     val source    = stringToSource(row.source)
     val createdAt = row.createdAt.toInstant
     val language  = row.language.map(LanguageCode.unsafe)
@@ -43,7 +53,7 @@ object TranscriptRow:
     Transcript(
       id = row.id,
       language = language,
-      text = row.text,
+      words = words,
       confidence = row.confidence,
       createdAt = createdAt,
       source = source,

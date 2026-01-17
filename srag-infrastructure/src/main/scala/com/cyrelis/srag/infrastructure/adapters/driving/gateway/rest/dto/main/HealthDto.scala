@@ -2,7 +2,6 @@ package com.cyrelis.srag.infrastructure.adapters.driving.gateway.rest.dto.main
 
 import com.cyrelis.srag.application.types.HealthStatus
 import io.circe.Codec
-import io.circe.generic.semiauto.deriveCodec
 
 final case class HealthStatusRestDto(
   status: String,
@@ -11,11 +10,9 @@ final case class HealthStatusRestDto(
   error: Option[String] = None,
   timeoutMs: Option[Long] = None,
   details: Map[String, String] = Map.empty
-)
+) derives Codec
 
 object HealthStatusRestDto {
-  given Codec[HealthStatusRestDto] = deriveCodec
-
   def fromDomain(healthStatus: HealthStatus): HealthStatusRestDto = healthStatus match {
     case HealthStatus.Healthy(serviceName, checkedAt, details) =>
       HealthStatusRestDto(

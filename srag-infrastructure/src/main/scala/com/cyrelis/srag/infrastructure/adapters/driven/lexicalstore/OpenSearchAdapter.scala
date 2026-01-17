@@ -12,8 +12,7 @@ import com.cyrelis.srag.application.ports.driven.storage.{DocumentInfo, LexicalS
 import com.cyrelis.srag.application.types.{HealthStatus, LexicalSearchResult, VectorStoreFilter}
 import com.cyrelis.srag.infrastructure.config.LexicalStoreAdapterConfig
 import com.cyrelis.srag.infrastructure.resilience.ErrorMapper
-import io.circe.generic.semiauto.*
-import io.circe.{parser, *}
+import io.circe.{Decoder, parser, *}
 import sttp.client4.httpclient.zio.HttpClientZioBackend
 import sttp.client4.{Backend, *}
 import sttp.model.MediaType
@@ -189,18 +188,13 @@ final class OpenSearchAdapter(config: LexicalStoreAdapterConfig.OpenSearch) exte
     segment_index: Int,
     text: String,
     metadata: Option[Map[String, String]]
-  )
+  ) derives Decoder
 
-  private final case class OpenSearchHit(_id: String, _score: Double, _source: OpenSearchHitSource)
+  private final case class OpenSearchHit(_id: String, _score: Double, _source: OpenSearchHitSource) derives Decoder
 
-  private final case class OpenSearchHits(hits: List[OpenSearchHit])
+  private final case class OpenSearchHits(hits: List[OpenSearchHit]) derives Decoder
 
-  private final case class OpenSearchSearchResponse(hits: OpenSearchHits)
-
-  private given Decoder[OpenSearchHitSource]      = deriveDecoder
-  private given Decoder[OpenSearchHit]            = deriveDecoder
-  private given Decoder[OpenSearchHits]           = deriveDecoder
-  private given Decoder[OpenSearchSearchResponse] = deriveDecoder
+  private final case class OpenSearchSearchResponse(hits: OpenSearchHits) derives Decoder
 
   override def search(
     queryText: String,

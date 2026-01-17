@@ -21,7 +21,7 @@ import com.cyrelis.srag.infrastructure.adapters.driven.embedder.HuggingFaceAdapt
 import com.cyrelis.srag.infrastructure.adapters.driven.lexicalstore.OpenSearchAdapter
 import com.cyrelis.srag.infrastructure.adapters.driven.queue.RedisJobQueueAdapter
 import com.cyrelis.srag.infrastructure.adapters.driven.reranker.TransformersRerankerAdapter
-import com.cyrelis.srag.infrastructure.adapters.driven.transcriber.WhisperAdapter
+import com.cyrelis.srag.infrastructure.adapters.driven.transcriber.{AssemblyAIAdapter, WhisperAdapter}
 import com.cyrelis.srag.infrastructure.adapters.driven.vectorstore.QdrantAdapter
 import com.cyrelis.srag.infrastructure.adapters.driving.Gateway
 import com.cyrelis.srag.infrastructure.adapters.driving.gateway.rest.IngestRestGateway
@@ -79,6 +79,8 @@ object AdapterFactory {
     config match {
       case cfg: TranscriberAdapterConfig.Whisper =>
         new WhisperAdapter(cfg)
+      case cfg: TranscriberAdapterConfig.AssemblyAI =>
+        new AssemblyAIAdapter(cfg)
     }
 
   def createEmbedderAdapter(config: EmbedderAdapterConfig): EmbedderPort =

@@ -2,5 +2,5 @@
 set -e
 
 echo "Starting Docker containers (Ctrl+C to stop)..."
-exec docker-compose up
+exec docker compose up
 

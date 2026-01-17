@@ -27,7 +27,7 @@ final class PostgresTranscriptRepository(
           .insertValue(lift(transcriptRow))
           .onConflictUpdate(_.id)(
             (existing, excluded) => existing.language   -> excluded.language,
-            (existing, excluded) => existing.text       -> excluded.text,
+            (existing, excluded) => existing.words      -> excluded.words,
             (existing, excluded) => existing.confidence -> excluded.confidence,
             (existing, excluded) => existing.source     -> excluded.source,
             (existing, excluded) => existing.metadata   -> excluded.metadata

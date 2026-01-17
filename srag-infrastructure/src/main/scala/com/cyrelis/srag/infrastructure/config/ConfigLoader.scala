@@ -261,6 +261,12 @@ object ConfigLoader {
           modelPath = whConfig.getString("model-path"),
           apiUrl = whConfig.getString("api-url")
         )
+      case "assemblyai" =>
+        val aaiConfig = config.getConfig("assemblyai")
+        TranscriberAdapterConfig.AssemblyAI(
+          apiUrl = aaiConfig.getString("api-url"),
+          apiKey = aaiConfig.getString("api-key")
+        )
 
       case other =>
         throw new IllegalArgumentException(s"Unknown transcriber type: $other")

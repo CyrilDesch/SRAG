@@ -30,7 +30,7 @@
         "id": "database"
       },
       "type": "shell",
-      "command": "docker-compose up -d --wait",
+      "command": "docker compose up -d --wait",
       "presentation": {
         "panel": "dedicated",
         "group": "runDevCmd",

@@ -148,12 +148,8 @@ final class DefaultQueryService(
       val worstScore = scores.last
       val gap        = topScore - worstScore
 
-      if (topScore < minAbsoluteScore) {
-        ZIO.logWarning(s"Top reranker score too low ($topScore < $minAbsoluteScore), returning empty") *>
-          ZIO.succeed(List.empty)
-      } else if (gap < minAcceptableGap) {
-        ZIO.logWarning(s"Reranker gap too small ($gap < $minAcceptableGap), returning empty") *>
-          ZIO.succeed(List.empty)
+      if (topScore < minAbsoluteScore || gap < minAcceptableGap) {
+        ZIO.succeed(List.empty)
       } else {
         val threshold = topScore - (gap * rerankerTopKRatio)
         val filtered  = sorted
@@ -162,8 +158,7 @@ final class DefaultQueryService(
           .map(toContextSegment)
 
         if (filtered.isEmpty) {
-          ZIO.logWarning(s"All results filtered out (threshold=$threshold)") *>
-            ZIO.succeed(List.empty)
+          ZIO.succeed(List.empty)
         } else {
           ZIO.succeed(filtered)
         }

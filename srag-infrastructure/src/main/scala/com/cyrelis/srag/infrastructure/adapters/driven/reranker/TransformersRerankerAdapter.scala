@@ -12,30 +12,18 @@ import com.cyrelis.srag.application.types.{HealthStatus, RerankerCandidate, Rera
 import com.cyrelis.srag.infrastructure.config.RerankerAdapterConfig
 import com.cyrelis.srag.infrastructure.resilience.ErrorMapper
 import io.circe.Codec
-import io.circe.generic.semiauto.*
 import io.circe.syntax.*
 import sttp.client4.*
 import sttp.client4.httpclient.zio.HttpClientZioBackend
 import sttp.model.MediaType
 import zio.*
 
-final case class TransformersRerankRequest(query: String, documents: List[String])
+final case class TransformersRerankRequest(query: String, documents: List[String]) derives Codec
 
-object TransformersRerankRequest {
-  given Codec[TransformersRerankRequest] = deriveCodec
-}
-
-final case class TransformersRerankDocumentScore(document: String, score: Double)
-
-object TransformersRerankDocumentScore {
-  given Codec[TransformersRerankDocumentScore] = deriveCodec
-}
+final case class TransformersRerankDocumentScore(document: String, score: Double) derives Codec
 
 final case class TransformersRerankResponse(query: String, scores: Option[List[TransformersRerankDocumentScore]])
-
-object TransformersRerankResponse {
-  given Codec[TransformersRerankResponse] = deriveCodec
-}
+    derives Codec
 
 class TransformersRerankerAdapter(config: RerankerAdapterConfig.Transformers) extends RerankerPort {
 

@@ -44,6 +44,8 @@ SRAG is designed with **Hexagonal Architecture** principles, making it easy to s
 - [ ] Implement better test of infrastructure modules
 - [ ] Implement test of application use cases
 - [ ] Build a documentation website
+- [ ] Handle removing of documents, audio or text in all our structures
+- [ ] Handle updating of documents, audio or text in all our structures
 
 ## 📋 Prerequisites
 
@@ -66,7 +68,7 @@ cd srag
 
 ```bash
 # Start all open-source dependencies
-docker-compose up -d
+docker compose up -d
 ```
 
 This starts the following Docker containers:

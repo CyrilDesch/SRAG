@@ -5,7 +5,7 @@ import java.util.UUID
 
 import com.cyrelis.srag.application.errors.PipelineError
 import com.cyrelis.srag.application.types.HealthStatus
-import com.cyrelis.srag.domain.transcript.{IngestSource, Transcript}
+import com.cyrelis.srag.domain.transcript.{IngestSource, Transcript, Word}
 import com.cyrelis.srag.infrastructure.adapters.driven.embedder.{HuggingFaceAdapter, HuggingFaceResponse}
 import com.cyrelis.srag.infrastructure.config.EmbedderAdapterConfig
 import io.circe.syntax.*
@@ -17,6 +17,22 @@ import zio.test.Assertion.*
 
 object HuggingFaceAdapterTest extends ZIOSpecDefault {
 
+  private def textToWords(text: String): List[Word] =
+    if text.isEmpty then List.empty
+    else
+      text
+        .split("\\s+")
+        .zipWithIndex
+        .map { case (wordText, idx) =>
+          Word(
+            text = wordText,
+            start = idx * 100L,
+            end = (idx + 1) * 100L,
+            confidence = 0.95
+          )
+        }
+        .toList
+
   private val testConfig: EmbedderAdapterConfig.HuggingFace = EmbedderAdapterConfig.HuggingFace(
     model = "sentence-transformers/all-MiniLM-L6-v2",
     apiUrl = "http://localhost:8082"
@@ -25,7 +41,7 @@ object HuggingFaceAdapterTest extends ZIOSpecDefault {
   private val testTranscript: Transcript = Transcript(
     id = UUID.randomUUID(),
     language = None,
-    text = "This is a test transcript for embedding generation.",
+    words = textToWords("This is a test transcript for embedding generation."),
     confidence = 0.95,
     createdAt = Instant.now(),
     source = IngestSource.Text,
@@ -144,7 +160,7 @@ object HuggingFaceAdapterTest extends ZIOSpecDefault {
         )
       },
       test("should handle empty text transcripts") {
-        val emptyTranscript = testTranscript.copy(text = "")
+        val emptyTranscript = testTranscript.copy(words = List.empty)
         val adapter         = new HuggingFaceAdapter(testConfig)
 
         for {
@@ -153,7 +169,7 @@ object HuggingFaceAdapterTest extends ZIOSpecDefault {
       },
       test("should chunk long text transcripts into multiple segments") {
         val longText           = ("This is a sentence. " * 100) + "This is another sentence. " * 100
-        val longTextTranscript = testTranscript.copy(text = longText)
+        val longTextTranscript = testTranscript.copy(words = textToWords(longText))
 
         val mockEmbedding = List.fill(384)(0.1f)
         val adapter       = new HuggingFaceAdapter(testConfig) {

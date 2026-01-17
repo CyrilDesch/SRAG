@@ -10,7 +10,7 @@ import com.cyrelis.srag.application.ports.driven.reranker.RerankerPort
 import com.cyrelis.srag.application.ports.driven.storage.{BlobStorePort, LexicalStorePort, VectorStorePort}
 import com.cyrelis.srag.application.ports.driven.transcription.TranscriberPort
 import com.cyrelis.srag.application.types.RerankerCandidate
-import com.cyrelis.srag.domain.transcript.{IngestSource, Transcript, TranscriptRepository}
+import com.cyrelis.srag.domain.transcript.{IngestSource, Transcript, TranscriptRepository, Word}
 import com.cyrelis.srag.infrastructure.adapters.driving.gateway.rest.dto.common.IngestSourceDto
 import com.cyrelis.srag.infrastructure.adapters.driving.gateway.rest.dto.test.*
 import com.cyrelis.srag.infrastructure.adapters.driving.gateway.rest.error.ErrorHandler
@@ -39,7 +39,14 @@ object TestHandlers {
     val transcript = Transcript(
       id = UUID.randomUUID(),
       language = None,
-      text = req.content,
+      words = List(
+        Word(
+          text = req.content,
+          start = 0L,
+          end = 0L,
+          confidence = 1.0
+        )
+      ),
       confidence = 1.0,
       createdAt = java.time.Instant.now(),
       source = IngestSource.Text,
@@ -97,7 +104,14 @@ object TestHandlers {
     val transcript   = Transcript(
       id = UUID.randomUUID(),
       language = None,
-      text = req.text,
+      words = List(
+        Word(
+          text = req.text,
+          start = 0L,
+          end = 0L,
+          confidence = 1.0
+        )
+      ),
       confidence = 1.0,
       createdAt = java.time.Instant.now(),
       source = domainSource,
@@ -121,7 +135,14 @@ object TestHandlers {
       transcript    = Transcript(
                      id = transcriptId,
                      language = None,
-                     text = req.text,
+                     words = List(
+                       Word(
+                         text = req.text,
+                         start = 0L,
+                         end = 0L,
+                         confidence = 1.0
+                       )
+                     ),
                      confidence = 1.0,
                      createdAt = java.time.Instant.now(),
                      source = IngestSource.Text,

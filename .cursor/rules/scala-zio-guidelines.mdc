@@ -14,6 +14,8 @@ description: Scala and ZIO coding guidelines for SRAG
 - Prefer immutability everywhere
 - Use meaningful names (avoid abbreviations unless standard)
 - Keep functions small and focused (single responsibility)
+- Don't put useless comments in the code.
+- Prefer throwing error instead of using fallback values.
 
 ### ZIO Effects
 

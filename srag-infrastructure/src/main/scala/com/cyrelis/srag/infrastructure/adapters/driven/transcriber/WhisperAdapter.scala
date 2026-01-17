@@ -8,11 +8,10 @@ import scala.concurrent.duration.*
 
 import com.cyrelis.srag.application.ports.driven.transcription.TranscriberPort
 import com.cyrelis.srag.application.types.HealthStatus
-import com.cyrelis.srag.domain.transcript.{IngestSource, LanguageCode, Transcript}
+import com.cyrelis.srag.domain.transcript.{IngestSource, LanguageCode, Transcript, Word}
 import com.cyrelis.srag.infrastructure.config.TranscriberAdapterConfig
 import com.cyrelis.srag.infrastructure.resilience.ErrorMapper
 import io.circe.Codec
-import io.circe.generic.semiauto.*
 import io.circe.parser.*
 import sttp.client4.*
 import sttp.client4.httpclient.zio.HttpClientZioBackend
@@ -22,11 +21,7 @@ import zio.*
 final case class WhisperResponse(
   text: String,
   language: Option[String]
-)
-
-object WhisperResponse {
-  given Codec[WhisperResponse] = deriveCodec
-}
+) derives Codec
 
 class WhisperAdapter(config: TranscriberAdapterConfig.Whisper) extends TranscriberPort {
 
@@ -58,20 +53,35 @@ class WhisperAdapter(config: TranscriberAdapterConfig.Whisper) extends Transcrib
           ZIO.logDebug(
             s"Parsed Whisper response: text length=${whisperResponse.text.length}, language=${whisperResponse.language.getOrElse("none")}"
           )
-        transcript <- ZIO.succeed(
-                        Transcript(
-                          id = transcriptId,
-                          language = whisperResponse.language.map(LanguageCode.unsafe),
-                          text = whisperResponse.text,
-                          confidence = 0.8,
-                          createdAt = now,
-                          source = IngestSource.Audio,
-                          metadata = Map(
-                            "provider" -> "whisper",
-                            "model"    -> config.modelPath
+        transcript <- if (whisperResponse.text.isEmpty) {
+                        ZIO.fail(
+                          new RuntimeException(
+                            s"Whisper API returned empty text for transcript $transcriptId"
                           )
                         )
-                      )
+                      } else {
+                        ZIO.succeed(
+                          Transcript(
+                            id = transcriptId,
+                            language = whisperResponse.language.map(LanguageCode.unsafe),
+                            words = List(
+                              Word(
+                                text = whisperResponse.text,
+                                start = 0L,
+                                end = 0L,
+                                confidence = 0.8
+                              )
+                            ),
+                            confidence = 0.8,
+                            createdAt = now,
+                            source = IngestSource.Audio,
+                            metadata = Map(
+                              "provider" -> "whisper",
+                              "model"    -> config.modelPath
+                            )
+                          )
+                        )
+                      }
       } yield transcript
     }
   }

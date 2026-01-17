@@ -340,7 +340,8 @@
                     html += '<thead><tr><th>ID</th><th>Created</th><th>Source</th><th>Language</th><th>Text Preview</th><th>Metadata</th></tr></thead><tbody>';
                     
                     transcripts.forEach(t => {
-                        const textPreview = t.text.length > 100 ? t.text.substring(0, 100) + '...' : t.text;
+                        const textFromWords = t.words ? t.words.map(w => w.text).join(' ') : '';
+                        const textPreview = textFromWords.length > 100 ? textFromWords.substring(0, 100) + '...' : textFromWords;
                         html += `<tr>
                             <td><code>${t.id.substring(0, 8)}...</code></td>
                             <td>${new Date(t.createdAt).toLocaleString()}</td>

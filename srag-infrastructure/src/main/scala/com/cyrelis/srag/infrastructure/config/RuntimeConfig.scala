@@ -84,6 +84,7 @@ enum RerankerAdapterConfig:
 
 enum TranscriberAdapterConfig:
   case Whisper(modelPath: String, apiUrl: String)
+  case AssemblyAI(apiUrl: String, apiKey: String)
 
 enum EmbedderAdapterConfig:
   case HuggingFace(model: String, apiUrl: String)

@@ -6,24 +6,15 @@ import scala.concurrent.duration.*
 
 import com.cyrelis.srag.infrastructure.config.VectorStoreAdapterConfig
 import io.circe.Codec
-import io.circe.generic.semiauto.*
 import io.circe.syntax.*
 import sttp.client4.*
 import sttp.client4.httpclient.zio.HttpClientZioBackend
 import sttp.model.MediaType
 import zio.*
 
-final case class QdrantCollectionCreateRequest(vectors: QdrantVectorsCreateConfig)
+final case class QdrantCollectionCreateRequest(vectors: QdrantVectorsCreateConfig) derives Codec
 
-object QdrantCollectionCreateRequest {
-  given Codec[QdrantCollectionCreateRequest] = deriveCodec
-}
-
-final case class QdrantVectorsCreateConfig(size: Int, distance: String = "Cosine")
-
-object QdrantVectorsCreateConfig {
-  given Codec[QdrantVectorsCreateConfig] = deriveCodec
-}
+final case class QdrantVectorsCreateConfig(size: Int, distance: String = "Cosine") derives Codec
 
 trait VectorStoreInitializer {
   def initialize(): Task[Unit]

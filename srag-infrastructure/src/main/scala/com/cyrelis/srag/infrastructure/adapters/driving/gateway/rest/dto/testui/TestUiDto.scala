@@ -1,7 +1,6 @@
 package com.cyrelis.srag.infrastructure.adapters.driving.gateway.rest.dto.testui
 
 import io.circe.Codec
-import io.circe.generic.semiauto.deriveCodec
 
 final case class AdminJobDto(
   jobId: String,
@@ -14,11 +13,7 @@ final case class AdminJobDto(
   createdAt: String,
   updatedAt: String,
   metadata: Option[Map[String, String]]
-)
-
-object AdminJobDto {
-  given Codec[AdminJobDto] = deriveCodec
-}
+) derives Codec
 
 final case class AdminBlobDto(
   key: String,
@@ -26,11 +21,7 @@ final case class AdminBlobDto(
   contentType: Option[String],
   size: Option[Long],
   created: Option[String]
-)
-
-object AdminBlobDto {
-  given Codec[AdminBlobDto] = deriveCodec
-}
+) derives Codec
 
 final case class AdminVectorDto(
   id: String,
@@ -38,20 +29,12 @@ final case class AdminVectorDto(
   segmentIndex: Option[Int],
   vector: Option[List[Float]],
   payload: Option[Map[String, String]]
-)
-
-object AdminVectorDto {
-  given Codec[AdminVectorDto] = deriveCodec
-}
+) derives Codec
 
 final case class AdminVectorsResponse(
   total: Int,
   vectors: List[AdminVectorDto]
-)
-
-object AdminVectorsResponse {
-  given Codec[AdminVectorsResponse] = deriveCodec
-}
+) derives Codec
 
 final case class AdminOpenSearchDocument(
   id: String,
@@ -59,17 +42,9 @@ final case class AdminOpenSearchDocument(
   segmentIndex: Option[Int],
   text: Option[String],
   metadata: Option[Map[String, String]]
-)
-
-object AdminOpenSearchDocument {
-  given Codec[AdminOpenSearchDocument] = deriveCodec
-}
+) derives Codec
 
 final case class AdminOpenSearchResponse(
   total: Int,
   documents: List[AdminOpenSearchDocument]
-)
-
-object AdminOpenSearchResponse {
-  given Codec[AdminOpenSearchResponse] = deriveCodec
-}
+) derives Codec

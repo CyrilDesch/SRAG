@@ -12,7 +12,6 @@ import com.cyrelis.srag.application.types.{HealthStatus, VectorSearchResult, Vec
 import com.cyrelis.srag.infrastructure.config.VectorStoreAdapterConfig
 import com.cyrelis.srag.infrastructure.resilience.ErrorMapper
 import io.circe.Codec
-import io.circe.generic.semiauto.*
 import io.circe.parser.*
 import io.circe.syntax.*
 import sttp.client4.*
@@ -20,58 +19,27 @@ import sttp.client4.httpclient.zio.HttpClientZioBackend
 import sttp.model.MediaType
 import zio.*
 
-final case class QdrantPoint(id: String, vector: List[Float], payload: Map[String, String])
+final case class QdrantPoint(id: String, vector: List[Float], payload: Map[String, String]) derives Codec
 
-object QdrantPoint {
-  given Codec[QdrantPoint] = deriveCodec
-}
+final case class QdrantUpsertRequest(points: List[QdrantPoint]) derives Codec
 
-final case class QdrantUpsertRequest(points: List[QdrantPoint])
+final case class QdrantFilterMatch(value: String) derives Codec
 
-object QdrantUpsertRequest {
-  given Codec[QdrantUpsertRequest] = deriveCodec
-}
+final case class QdrantFilterCondition(key: String, `match`: QdrantFilterMatch) derives Codec
 
-final case class QdrantFilterMatch(value: String)
-
-object QdrantFilterMatch {
-  given Codec[QdrantFilterMatch] = deriveCodec
-}
-
-final case class QdrantFilterCondition(key: String, `match`: QdrantFilterMatch)
-
-object QdrantFilterCondition {
-  given Codec[QdrantFilterCondition] = deriveCodec
-}
-
-final case class QdrantFilter(must: List[QdrantFilterCondition])
-
-object QdrantFilter {
-  given Codec[QdrantFilter] = deriveCodec
-}
+final case class QdrantFilter(must: List[QdrantFilterCondition]) derives Codec
 
 final case class QdrantSearchRequest(
   vector: List[Float],
   limit: Int,
   filter: Option[QdrantFilter] = None,
   with_payload: Option[Boolean] = Some(true)
-)
-
-object QdrantSearchRequest {
-  given Codec[QdrantSearchRequest] = deriveCodec
-}
+) derives Codec
 
 final case class QdrantSearchResult(id: String, score: Double, payload: Option[Map[String, String]] = None)
+    derives Codec
 
-object QdrantSearchResult {
-  given Codec[QdrantSearchResult] = deriveCodec
-}
-
-final case class QdrantSearchResponse(result: List[QdrantSearchResult])
-
-object QdrantSearchResponse {
-  given Codec[QdrantSearchResponse] = deriveCodec
-}
+final case class QdrantSearchResponse(result: List[QdrantSearchResult]) derives Codec
 
 final class QdrantAdapter(config: VectorStoreAdapterConfig.Qdrant) extends VectorStorePort {
 
@@ -220,39 +188,23 @@ final class QdrantAdapter(config: VectorStoreAdapterConfig.Qdrant) extends Vecto
     offset: Option[String] = None,
     with_payload: Option[Boolean] = Some(true),
     with_vector: Option[Boolean] = Some(true)
-  )
-
-  object QdrantScrollRequest {
-    given Codec[QdrantScrollRequest] = deriveCodec
-  }
+  ) derives Codec
 
   final case class QdrantScrollResult(
     id: String,
     payload: Option[Map[String, String]] = None,
     vector: Option[List[Float]] = None
-  )
-
-  object QdrantScrollResult {
-    given Codec[QdrantScrollResult] = deriveCodec
-  }
+  ) derives Codec
 
   final case class QdrantScrollPage(
     points: List[QdrantScrollResult],
     next_page_offset: Option[String] = None
-  )
-
-  object QdrantScrollPage {
-    given Codec[QdrantScrollPage] = deriveCodec
-  }
+  ) derives Codec
 
   final case class QdrantScrollResponse(
     result: QdrantScrollPage,
     status: Option[String] = None
-  )
-
-  object QdrantScrollResponse {
-    given Codec[QdrantScrollResponse] = deriveCodec
-  }
+  ) derives Codec
 
   override def listAllVectors(): ZIO[Any, PipelineError, List[VectorInfo]] =
     ErrorMapper.mapVectorStoreError {

@@ -12,3 +12,4 @@ dist/
 # The CI will use the tag to publish the image
 version.sbt
 example
+.env
