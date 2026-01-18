@@ -14,3 +14,6 @@ addSbtPlugin("org.foundweekends.giter8" % "sbt-giter8-scaffold" % "0.18.0")
 addSbtPlugin("ch.epfl.scala" % "sbt-scalafix" % "0.14.3")
 // Bloop for Metals support
 addSbtPlugin("ch.epfl.scala" % "sbt-bloop" % "1.5.15")
+// Gatling plugin for performance testing
+addSbtPlugin("io.gatling" % "gatling-sbt" % "4.17.8")
+

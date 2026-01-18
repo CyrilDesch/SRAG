@@ -19,6 +19,7 @@ object Dependencies {
     val zioConfig   = "4.0.2"
     val zioLogging  = "2.2.4"
     val zioPrelude  = "1.0.0-RC36"
+    val gatling     = "3.14.7"
   }
 
   private val zioCoreDependencies = Seq(
@@ -69,7 +70,10 @@ object Dependencies {
       "org.scalameta" %% "munit"        % Versions.mUnit % Test,
       "dev.zio"       %% "zio-test"     % Versions.zio   % Test,
       "dev.zio"       %% "zio-test-sbt" % Versions.zio   % Test,
-      "org.scalamock" %% "scalamock"    % "6.0.0"        % Test
+      "org.scalamock" %% "scalamock"    % "6.0.0"        % Test,
+      "io.gatling.highcharts" % "gatling-charts-highcharts" % Versions.gatling % Test,
+      "io.gatling"            % "gatling-test-framework"    % Versions.gatling % Test
+
     )
 
   val domainLibraryDependencies: Setting[Seq[ModuleID]] =

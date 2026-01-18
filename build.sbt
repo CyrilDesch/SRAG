@@ -14,7 +14,13 @@ inThisBuild(
     scalaVersion := scala3,
     dependencyOverrides ++= Seq(
       "org.scala-lang" %% "scala3-library" % scala3,
-      "dev.zio"        %% "zio-json"       % "0.7.40"
+      "dev.zio"        %% "zio-json"       % "0.7.40",
+      "io.suzaku"      %% "boopickle"      % "1.5.0",
+      "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5"
+    ),
+    excludeDependencies ++= Seq(
+      ExclusionRule("io.suzaku", "boopickle_2.13"),
+      ExclusionRule("com.typesafe.scala-logging", "scala-logging_2.13")
     ),
     semanticdbEnabled := true,
     semanticdbVersion := scalafixSemanticdb.revision,
@@ -62,7 +68,7 @@ lazy val `srag-application` = project
 
 lazy val `srag-infrastructure` = project
   .in(file("srag-infrastructure"))
-  .enablePlugins(JavaAppPackaging, DockerPlugin, AshScriptPlugin, RevolverPlugin)
+  .enablePlugins(JavaAppPackaging, DockerPlugin, AshScriptPlugin, RevolverPlugin, GatlingPlugin)
   .dependsOn(`srag-application`)
   .settings(
     fork      := true,
