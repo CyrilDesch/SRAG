@@ -4,21 +4,19 @@ import io.gatling.core.Predef._
 import io.gatling.http.Predef._
 import scala.concurrent.duration._
 
-class LoadTest extends Simulation {
+class BasicUserWorkflowTest extends Simulation {
 
   val httpProtocol = http
     .baseUrl("http://localhost:8080")
     .acceptHeader("application/json")
     .contentTypeHeader("application/json")
 
-  // Feeder pour générer du contenu varié
   val textContentFeeder = Iterator.continually(
     Map(
       "content" -> s"This is a sample text content for testing purposes. Text number ${scala.util.Random.nextInt(1000)}. Lorem ipsum dolor sit amet, consectetur adipiscing elit."
     )
   )
 
-  // Feeder pour les questions du RAG
   val queryFeeder = Iterator.continually(
     Map(
       "query" -> List(
@@ -33,7 +31,7 @@ class LoadTest extends Simulation {
 
   val scn = scenario("Complete User Journey")
     .feed(textContentFeeder)
-    // 1. Ingestion du contenu texte
+    // 1. Ingest text content
     .exec(
       http("Ingest Text")
         .post("/api/v1/ingest/text")
@@ -45,7 +43,7 @@ class LoadTest extends Simulation {
     )
     .pause(1.second)
 
-    // 2. Polling pour attendre que le job soit complété
+    // 2. Waiting until the ingest jobs has been completed
     .asLongAs(session => session("jobStatus").asOption[String].getOrElse("pending") != "Success") {
       exec { session =>
         session.set("jobUrl", s"/api/v1/jobs/${session("jobId").as[String]}")
@@ -61,7 +59,7 @@ class LoadTest extends Simulation {
     }
     .pause(1.second)
 
-    // 3. Vérification des transcriptions
+    // 3. Verify that we got transcription
     .exec(
       http("Get Transcripts")
         .get("/api/v1/transcripts")
@@ -69,7 +67,7 @@ class LoadTest extends Simulation {
     )
     .pause(1.second)
 
-    // 4. Plusieurs requêtes au RAG (3 à 5 questions)
+    // 4. Ask few question about the content
     .repeat(_ => 3 + scala.util.Random.nextInt(3), "queryCount") {
       feed(queryFeeder)
         .exec(
