@@ -3,9 +3,6 @@
   "tasks": [
     {
       "label": "demo",
-      "runOptions": {
-        "runOn": "folderOpen"
-      },
       "dependsOrder": "sequence",
       "dependsOn": ["setup", "runDemo"],
       "problemMatcher": [],
