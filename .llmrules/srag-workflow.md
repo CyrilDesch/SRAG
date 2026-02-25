@@ -1,5 +1,4 @@
 ---
-alwaysApply: true
 description: Development workflow and tooling guidelines
 ---
 

@@ -1,5 +1,4 @@
 ---
-alwaysApply: true
 description: SRAG hexagonal architecture and module structure
 ---
 

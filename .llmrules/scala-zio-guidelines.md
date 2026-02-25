@@ -1,5 +1,4 @@
 ---
-globs: *.scala
 description: Scala and ZIO coding guidelines for SRAG
 ---
 
