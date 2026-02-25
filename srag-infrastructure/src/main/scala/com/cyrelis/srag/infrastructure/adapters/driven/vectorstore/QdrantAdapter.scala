@@ -54,7 +54,7 @@ final class QdrantAdapter(config: VectorStoreAdapterConfig.Qdrant) extends Vecto
   private val baseUrl = config.url.stripSuffix("/")
 
   private def buildHeaders(): Map[String, String] =
-    if (config.apiKey.nonEmpty) Map("api-key" -> config.apiKey) else Map.empty
+    if (config.apiKey.nonEmpty) Map("api-key" -> config.apiKey.get) else Map.empty
 
   override def upsertEmbeddings(
     transcriptId: UUID,

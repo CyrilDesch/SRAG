@@ -8,4 +8,4 @@ if [ -f .env ]; then
   set +a
 fi
 
-sbt -mem 4096 "srag-infrastructure/run"
+sbt '~srag-infrastructure/reStart'

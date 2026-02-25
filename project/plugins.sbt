@@ -13,4 +13,4 @@ addSbtPlugin("org.foundweekends.giter8" % "sbt-giter8-scaffold" % "0.18.0")
 // Scalafix
 addSbtPlugin("ch.epfl.scala" % "sbt-scalafix" % "0.14.3")
 // Bloop for Metals support
-addSbtPlugin("ch.epfl.scala" % "sbt-bloop" % "1.5.15")
+addSbtPlugin("ch.epfl.scala" % "sbt-bloop" % "2.0.18")

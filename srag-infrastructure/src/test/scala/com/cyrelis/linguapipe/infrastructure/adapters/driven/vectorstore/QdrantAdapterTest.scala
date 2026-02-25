@@ -9,7 +9,7 @@ object QdrantAdapterTest extends ZIOSpecDefault:
 
   private val invalidConfig: VectorStoreAdapterConfig.Qdrant = VectorStoreAdapterConfig.Qdrant(
     url = "http://nonexistent-host:6333",
-    apiKey = "",
+    apiKey = Some(""),
     collection = "test-collection"
   )
 

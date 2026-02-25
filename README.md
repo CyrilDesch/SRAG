@@ -63,7 +63,33 @@ All services are ready to use with **no configuration needed**. The default `app
 sbt compile
 ```
 
-### 4. Run the application
+### 4. Copy the .env.example file to .env
+
+```bash
+cp .env.example .env
+```
+
+### 5. Run the project 
+
+#### Recommended
+
+```bash
+# Standard run (make sure Docker services are running first)
+./scripts/serverRun.sh
+
+# Hot reload on code changes (development)
+./scripts/hotServerRun.sh
+```
+
+#### Manually
+
+**Load environment variables if needed**
+
+```bash
+source scripts/loadenv.sh
+``` 
+
+**Run the application**
 
 ```bash
 # Standard run (make sure Docker services are running first)
@@ -71,9 +97,6 @@ sbt "srag-infrastructure/run"
 
 # Hot reload on code changes (development)
 sbt "~srag-infrastructure/reStart"
-
-# Test the application
-sbt test
 ```
 
 ## 🏗️ Architecture

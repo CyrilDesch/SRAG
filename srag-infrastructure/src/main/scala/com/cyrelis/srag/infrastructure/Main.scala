@@ -6,7 +6,7 @@ import com.cyrelis.srag.application.ports.driving.HealthCheckPort
 import com.cyrelis.srag.application.types.HealthStatus
 import com.cyrelis.srag.application.workers.DefaultIngestionJobWorker
 import com.cyrelis.srag.infrastructure.adapters.driving.Gateway
-import com.cyrelis.srag.infrastructure.config.RuntimeConfig
+import com.cyrelis.srag.infrastructure.config.{ConfigLoader, RuntimeConfig}
 import com.cyrelis.srag.infrastructure.migration.MigrationRunner
 import com.cyrelis.srag.infrastructure.runtime.*
 import zio.*
@@ -20,15 +20,18 @@ object Main extends ZIOAppDefault {
     Runtime.removeDefaultLoggers >>> zio.logging.backend.SLF4J.slf4j
 
   override def run: ZIO[ZIOAppArgs & Scope, Any, Any] =
-    startup.provide(
-      RuntimeConfig.layer
-        .tapError(err => ZIO.logError(s"Failed to load configuration: ${err.getMessage}"))
-        .orDie,
-      DatabaseModule.live,
-      DrivenModule.live,
-      ServiceModule.live,
-      DrivingModule.live
-    )
+    ConfigLoader.load.flatMap { config =>
+      startup
+        .provide(
+          ZLayer.succeed(config),
+          DatabaseModule.live,
+          DrivenModule.live,
+          ServiceModule.live,
+          DrivingModule.live
+        )
+    }.catchSome { case _: ConfigLoader.ConfigurationError =>
+      ZIO.succeed(ExitCode.failure)
+    }
 
   private def startup: ZIO[AppDependencies, Nothing, Unit] =
     ZIO.scoped {
@@ -73,12 +76,8 @@ object Main extends ZIOAppDefault {
       config <- ZIO.service[RuntimeConfig]
       _      <- if (config.migrations.runOnStartup) {
              MigrationRunner.runAll().catchAll { error =>
-               if (config.migrations.failOnError) {
-                 ZIO.logError(s"Migration failed and fail-on-error is enabled: ${error.getMessage}") *>
-                   ZIO.fail(error)
-               } else {
-                 ZIO.logWarning(s"Migration failed but continuing (fail-on-error is disabled): ${error.getMessage}")
-               }
+               ZIO.logError(s"Migration failed: ${error.getMessage}") *>
+                 ZIO.fail(error)
              }
            } else {
              ZIO.logInfo("Skipping migrations (run-on-startup is disabled)")
