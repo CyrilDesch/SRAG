@@ -1,32 +1,20 @@
 package com.cyrelis.srag.infrastructure
 
-import com.cyrelis.srag.application.errors.PipelineError
-import com.cyrelis.srag.application.ports.driven.datasource.DatasourcePort
-import com.cyrelis.srag.application.ports.driven.embedding.EmbedderPort
 import com.cyrelis.srag.application.ports.driven.job.JobQueuePort
 import com.cyrelis.srag.application.ports.driven.job.JobQueuePort.LockExpirationSeconds
-import com.cyrelis.srag.application.ports.driven.parser.DocumentParserPort
-import com.cyrelis.srag.application.ports.driven.reranker.RerankerPort
-import com.cyrelis.srag.application.ports.driven.storage.{BlobStorePort, LexicalStorePort, VectorStorePort}
-import com.cyrelis.srag.application.ports.driven.transcription.TranscriberPort
-import com.cyrelis.srag.application.ports.driving.{HealthCheckPort, IngestPort, QueryPort}
+import com.cyrelis.srag.application.ports.driving.HealthCheckPort
 import com.cyrelis.srag.application.types.HealthStatus
 import com.cyrelis.srag.application.workers.DefaultIngestionJobWorker
-import com.cyrelis.srag.domain.ingestionjob.IngestionJobRepository
-import com.cyrelis.srag.domain.transcript.TranscriptRepository
 import com.cyrelis.srag.infrastructure.adapters.driving.Gateway
 import com.cyrelis.srag.infrastructure.config.RuntimeConfig
 import com.cyrelis.srag.infrastructure.migration.MigrationRunner
-import com.cyrelis.srag.infrastructure.runtime.ModuleWiring
+import com.cyrelis.srag.infrastructure.runtime.*
 import zio.*
 
 object Main extends ZIOAppDefault {
 
-  type AllPorts = TranscriberPort & EmbedderPort & TranscriptRepository[[X] =>> ZIO[Any, PipelineError, X]] &
-    VectorStorePort & LexicalStorePort & RerankerPort & BlobStorePort & DocumentParserPort &
-    IngestionJobRepository[[X] =>> ZIO[Any, PipelineError, X]] & JobQueuePort & DatasourcePort
-  type AppDependencies = RuntimeConfig & IngestPort & HealthCheckPort & QueryPort & Gateway & AllPorts &
-    DefaultIngestionJobWorker
+  type AppDependencies = RuntimeConfig & DatabaseModule.DatabaseEnvironment & DrivenModule.DrivenEnvironment &
+    ServiceModule.ServiceEnvironment & DrivingModule.DrivingEnvironment
 
   override val bootstrap: ZLayer[ZIOAppArgs, Any, Any] =
     Runtime.removeDefaultLoggers >>> zio.logging.backend.SLF4J.slf4j
@@ -36,25 +24,10 @@ object Main extends ZIOAppDefault {
       RuntimeConfig.layer
         .tapError(err => ZIO.logError(s"Failed to load configuration: ${err.getMessage}"))
         .orDie,
-      ModuleWiring.transcriberLayer,
-      ModuleWiring.embedderLayer,
-      ModuleWiring.datasourceLayer,
-      ModuleWiring.transcriptRepositoryLayer,
-      ModuleWiring.vectorSinkLayer,
-      ModuleWiring.lexicalStoreLayer,
-      ModuleWiring.rerankerLayer,
-      ModuleWiring.blobStoreLayer,
-      ModuleWiring.documentParserLayer,
-      ModuleWiring.jobRepositoryLayer,
-      ModuleWiring.jobQueueLayer,
-      ModuleWiring.audioSourcePreparatorLayer,
-      ModuleWiring.textSourcePreparatorLayer,
-      ModuleWiring.commonIndexingPipelineLayer,
-      ModuleWiring.ingestServiceLayer,
-      ModuleWiring.jobWorkerLayer,
-      ModuleWiring.queryServiceLayer,
-      ModuleWiring.healthCheckLayer,
-      ModuleWiring.gatewayLayer
+      DatabaseModule.live,
+      DrivenModule.live,
+      ServiceModule.live,
+      DrivingModule.live
     )
 
   private def startup: ZIO[AppDependencies, Nothing, Unit] =
@@ -153,8 +126,7 @@ object Main extends ZIOAppDefault {
       }
       .unit
 
-  private def startGateway
-    : ZIO[Scope & Gateway & IngestPort & HealthCheckPort & QueryPort & RuntimeConfig & AllPorts, Throwable, Unit] =
+  private def startGateway: ZIO[Scope & AppDependencies, Throwable, Unit] =
     for {
       gateway <- ZIO.service[Gateway]
       _       <- gateway match {

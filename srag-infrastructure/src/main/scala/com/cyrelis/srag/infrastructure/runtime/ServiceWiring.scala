@@ -5,7 +5,6 @@ import com.cyrelis.srag.application.pipeline.{AudioSourcePreparator, IndexingPip
 import com.cyrelis.srag.application.ports.driven.datasource.DatasourcePort
 import com.cyrelis.srag.application.ports.driven.embedding.EmbedderPort
 import com.cyrelis.srag.application.ports.driven.job.JobQueuePort
-import com.cyrelis.srag.application.ports.driven.parser.DocumentParserPort
 import com.cyrelis.srag.application.ports.driven.reranker.RerankerPort
 import com.cyrelis.srag.application.ports.driven.storage.{BlobStorePort, LexicalStorePort, VectorStorePort}
 import com.cyrelis.srag.application.ports.driven.transcription.TranscriberPort
@@ -14,123 +13,10 @@ import com.cyrelis.srag.application.services.{DefaultHealthCheckService, Default
 import com.cyrelis.srag.application.workers.DefaultIngestionJobWorker
 import com.cyrelis.srag.domain.ingestionjob.IngestionJobRepository
 import com.cyrelis.srag.domain.transcript.TranscriptRepository
-import com.cyrelis.srag.infrastructure.adapters.driving.Gateway
-import com.cyrelis.srag.infrastructure.config.{AdapterFactory, RuntimeConfig}
-import com.cyrelis.srag.infrastructure.resilience.RetryWrappers
+import com.cyrelis.srag.infrastructure.config.RuntimeConfig
 import zio.*
 
-object ModuleWiring {
-
-  val transcriberLayer: ZLayer[RuntimeConfig, Nothing, TranscriberPort] =
-    ZLayer {
-      for {
-        config         <- ZIO.service[RuntimeConfig]
-        baseTranscriber = AdapterFactory.createTranscriberAdapter(config.adapters.driven.transcriber)
-        transcriber     = RetryWrappers.wrapTranscriber(baseTranscriber, config.retry, config.timeouts)
-      } yield transcriber
-    }
-
-  val embedderLayer: ZLayer[RuntimeConfig, Nothing, EmbedderPort] =
-    ZLayer {
-      for {
-        config      <- ZIO.service[RuntimeConfig]
-        baseEmbedder = AdapterFactory.createEmbedderAdapter(config.adapters.driven.embedder)
-        embedder     = RetryWrappers.wrapEmbedder(baseEmbedder, config.retry, config.timeouts)
-      } yield embedder
-    }
-
-  val datasourceLayer: ZLayer[RuntimeConfig, Throwable, DatasourcePort] =
-    ZLayer {
-      for {
-        config     <- ZIO.service[RuntimeConfig]
-        datasource <- ZIO
-                        .service[DatasourcePort]
-                        .provide(
-                          AdapterFactory.createDatasourceLayer(config.adapters.driven.database)
-                        )
-      } yield datasource
-    }
-
-  val transcriptRepositoryLayer
-    : ZLayer[RuntimeConfig & DatasourcePort, Throwable, TranscriptRepository[[X] =>> ZIO[Any, PipelineError, X]]] =
-    ZLayer {
-      for {
-        config   <- ZIO.service[RuntimeConfig]
-        _        <- ZIO.service[DatasourcePort]
-        baseRepo <- ZIO
-                      .service[TranscriptRepository[[X] =>> ZIO[Any, PipelineError, X]]]
-                      .provideSome[DatasourcePort](
-                        AdapterFactory.createTranscriptRepositoryLayer(config.adapters.driven.database)
-                      )
-        repo = RetryWrappers.wrapTranscriptRepository(baseRepo, config.retry, config.timeouts)
-      } yield repo
-    }
-
-  val vectorSinkLayer: ZLayer[RuntimeConfig, Nothing, VectorStorePort] =
-    ZLayer {
-      for {
-        config        <- ZIO.service[RuntimeConfig]
-        baseVectorSink = AdapterFactory.createVectorStoreAdapter(config.adapters.driven.vectorStore)
-        vectorSink     = RetryWrappers.wrapVectorSink(baseVectorSink, config.retry, config.timeouts)
-      } yield vectorSink
-    }
-
-  val lexicalStoreLayer: ZLayer[RuntimeConfig, Nothing, LexicalStorePort] =
-    ZLayer {
-      for {
-        config          <- ZIO.service[RuntimeConfig]
-        baseLexicalStore = AdapterFactory.createLexicalStoreAdapter(config.adapters.driven.lexicalStore)
-        lexicalStore     = RetryWrappers.wrapLexicalStore(baseLexicalStore, config.retry, config.timeouts)
-      } yield lexicalStore
-    }
-
-  val rerankerLayer: ZLayer[RuntimeConfig, Nothing, RerankerPort] =
-    ZLayer {
-      for {
-        config      <- ZIO.service[RuntimeConfig]
-        baseReranker = AdapterFactory.createRerankerAdapter(config.adapters.driven.reranker)
-        reranker     = RetryWrappers.wrapReranker(baseReranker, config.retry, config.timeouts)
-      } yield reranker
-    }
-
-  val blobStoreLayer: ZLayer[RuntimeConfig, Nothing, BlobStorePort] =
-    ZLayer {
-      for {
-        config       <- ZIO.service[RuntimeConfig]
-        baseBlobStore = AdapterFactory.createBlobStoreAdapter(config.adapters.driven.blobStore)
-        blobStore     = RetryWrappers.wrapBlobStore(baseBlobStore, config.retry, config.timeouts)
-      } yield blobStore
-    }
-
-  val documentParserLayer: ZLayer[RuntimeConfig, Nothing, DocumentParserPort] =
-    ZLayer {
-      for {
-        config            <- ZIO.service[RuntimeConfig]
-        baseDocumentParser = AdapterFactory.createDocumentParserAdapter()
-        documentParser     = RetryWrappers.wrapDocumentParser(baseDocumentParser, config.retry, config.timeouts)
-      } yield documentParser
-    }
-
-  val jobRepositoryLayer
-    : ZLayer[RuntimeConfig & DatasourcePort, Throwable, IngestionJobRepository[[X] =>> ZIO[Any, PipelineError, X]]] =
-    ZLayer {
-      for {
-        config  <- ZIO.service[RuntimeConfig]
-        _       <- ZIO.service[DatasourcePort]
-        jobRepo <- ZIO
-                     .service[IngestionJobRepository[[X] =>> ZIO[Any, PipelineError, X]]]
-                     .provideSome[DatasourcePort](
-                       AdapterFactory.createJobRepositoryLayer(config.adapters.driven.database)
-                     )
-        wrappedRepo = RetryWrappers.wrapJobRepository(jobRepo, config.retry, config.timeouts)
-      } yield wrappedRepo
-    }
-
-  val jobQueueLayer: ZLayer[RuntimeConfig, Throwable, JobQueuePort] =
-    ZLayer.fromZIO(ZIO.service[RuntimeConfig]).flatMap { env =>
-      val config = env.get[RuntimeConfig]
-      AdapterFactory.createJobQueueLayer(config.adapters.driven.jobQueue)
-    }
+trait ServiceWiring {
 
   val audioSourcePreparatorLayer: ZLayer[BlobStorePort & TranscriberPort, Nothing, AudioSourcePreparator] =
     ZLayer {
@@ -159,14 +45,6 @@ object ModuleWiring {
         vectorSink           <- ZIO.service[VectorStorePort]
         lexicalStore         <- ZIO.service[LexicalStorePort]
       } yield new IndexingPipeline(transcriptRepository, embedder, vectorSink, lexicalStore)
-    }
-
-  val gatewayLayer: ZLayer[RuntimeConfig, Nothing, Gateway] =
-    ZLayer {
-      for {
-        config <- ZIO.service[RuntimeConfig]
-        gateway = AdapterFactory.createGateway(config.adapters.driving.api)
-      } yield gateway
     }
 
   val ingestServiceLayer: ZLayer[
@@ -263,4 +141,30 @@ object ModuleWiring {
         jobQueue = jobQueue
       )
     }
+
+}
+
+object ServiceModule extends ServiceWiring {
+  type ServiceEnvironment = AudioSourcePreparator & TextSourcePreparator & IndexingPipeline & IngestPort &
+    DefaultIngestionJobWorker & QueryPort & HealthCheckPort
+
+  type RequiredDrivenEnv = TranscriberPort & EmbedderPort & VectorStorePort & LexicalStorePort & RerankerPort &
+    BlobStorePort & JobQueuePort
+
+  val live: ZLayer[
+    RuntimeConfig & DatabaseModule.DatabaseEnvironment & RequiredDrivenEnv,
+    Nothing,
+    ServiceEnvironment
+  ] = ZLayer.makeSome[
+    RuntimeConfig & DatabaseModule.DatabaseEnvironment & RequiredDrivenEnv,
+    ServiceEnvironment
+  ](
+    audioSourcePreparatorLayer,
+    textSourcePreparatorLayer,
+    commonIndexingPipelineLayer,
+    ingestServiceLayer,
+    jobWorkerLayer,
+    queryServiceLayer,
+    healthCheckLayer
+  )
 }
