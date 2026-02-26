@@ -8,8 +8,9 @@ import java.util.{Base64, UUID}
 import scala.concurrent.duration.*
 
 import com.cyrelis.srag.application.errors.PipelineError
-import com.cyrelis.srag.application.ports.driven.storage.{DocumentInfo, LexicalStorePort}
-import com.cyrelis.srag.application.types.{HealthStatus, LexicalSearchResult, VectorStoreFilter}
+import com.cyrelis.srag.application.model.healthcheck.HealthStatus
+import com.cyrelis.srag.application.model.query.{LexicalSearchResult, VectorStoreFilter}
+import com.cyrelis.srag.application.ports.{DocumentInfo, LexicalStorePort}
 import com.cyrelis.srag.infrastructure.config.LexicalStoreAdapterConfig
 import com.cyrelis.srag.infrastructure.resilience.ErrorMapper
 import io.circe.{Decoder, parser, *}
@@ -18,13 +19,8 @@ import sttp.client4.{Backend, *}
 import sttp.model.MediaType
 import zio.*
 
-final class OpenSearchAdapter(config: LexicalStoreAdapterConfig.OpenSearch) extends LexicalStorePort {
-
-  private val httpClient: HttpClient =
-    HttpClient
-      .newBuilder()
-      .version(HttpClient.Version.HTTP_1_1)
-      .build()
+private final class OpenSearchAdapter(config: LexicalStoreAdapterConfig.OpenSearch, httpClient: HttpClient)
+    extends LexicalStorePort {
 
   private val serviceName = s"OpenSearch(${config.index})"
 
@@ -357,6 +353,13 @@ final class OpenSearchAdapter(config: LexicalStoreAdapterConfig.OpenSearch) exte
 }
 
 object OpenSearchAdapter {
-  def apply(config: LexicalStoreAdapterConfig.OpenSearch): OpenSearchAdapter =
-    new OpenSearchAdapter(config)
+  val layer: ZLayer[LexicalStoreAdapterConfig.OpenSearch, Throwable, LexicalStorePort] =
+    ZLayer.scoped {
+      for {
+        config <- ZIO.service[LexicalStoreAdapterConfig.OpenSearch]
+        client <- ZIO.fromAutoCloseable(
+                    ZIO.attemptBlocking(HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build())
+                  )
+      } yield new OpenSearchAdapter(config, client)
+    }
 }

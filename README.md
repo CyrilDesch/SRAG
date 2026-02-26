@@ -209,7 +209,7 @@ srag.adapters.driven.vectorStore {
 
 To add a new driven adapter (e.g., Redis, MongoDB, etc.):
 
-1. Define the port interface in `srag-application/***/ports/driven/` (if it doesn't exist)
+1. Define the port interface in `srag-application/***/ports/` (if it doesn't exist)
 2. Add config types in `RuntimeConfig.scala`
 3. Implement the adapter in `srag-infrastructure/***/adapters/driven/[type]/[tech]/`
 4. Add factory case in `AdapterFactory.scala`
@@ -221,7 +221,7 @@ To add a new driven adapter (e.g., Redis, MongoDB, etc.):
 
 To add a new driving adapter (e.g., WebSocket, CLI, etc.):
 
-1. Define the driving port in `srag-application/***/ports/driving/`
+1. Consume the relevant use case interface from `srag-application/***/usecases/`
 2. Add config types in `RuntimeConfig.scala`
 3. Implement the adapter in `srag-infrastructure/***/adapters/driving/[tech]/`
 4. Wire it in the runtime module with ZIO layers
@@ -230,8 +230,8 @@ To add a new driving adapter (e.g., WebSocket, CLI, etc.):
 ### Development Workflow
 
 1. Model domain entities in `srag-domain`
-2. Define ports in `srag-application/***/ports`
-3. Implement use cases in `srag-application/***/usecase`
+2. Define driven ports in `srag-application/***/ports`
+3. Implement use cases (trait + service + ZLayer) in `srag-application/***/usecases`
 4. Create adapters in `srag-infrastructure/***/adapters`
 5. Wire everything in `srag-infrastructure/***/runtime`
 6. Configure in `application.conf`

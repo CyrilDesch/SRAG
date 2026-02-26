@@ -1,10 +1,10 @@
 package com.cyrelis.srag.infrastructure
 
-import com.cyrelis.srag.application.ports.driven.job.JobQueuePort
-import com.cyrelis.srag.application.ports.driven.job.JobQueuePort.LockExpirationSeconds
-import com.cyrelis.srag.application.ports.driving.HealthCheckPort
-import com.cyrelis.srag.application.types.HealthStatus
-import com.cyrelis.srag.application.workers.IngestionJobWorker
+import com.cyrelis.srag.application.ports.JobQueuePort
+import com.cyrelis.srag.application.ports.JobQueuePort.LockExpirationSeconds
+import com.cyrelis.srag.application.usecases.healthcheck.HealthCheckService
+import com.cyrelis.srag.application.model.healthcheck.HealthStatus
+import com.cyrelis.srag.application.usecases.ingestion.IngestionWorker
 import com.cyrelis.srag.infrastructure.adapters.driving.Gateway
 import com.cyrelis.srag.infrastructure.config.{ConfigLoader, RuntimeConfig}
 import com.cyrelis.srag.infrastructure.migration.MigrationRunner
@@ -40,7 +40,7 @@ object Main extends ZIOAppDefault {
         _      <- runMigrations
         _      <- ensureAllHealthy
         _      <- recoverAbandonedJobsAfterDelay.forkDaemon
-        worker <- ZIO.service[IngestionJobWorker]
+        worker <- ZIO.service[IngestionWorker]
         _      <- ZIO.logInfo("Starting ingestion job worker...")
         _      <- worker.run.forkScoped
         _      <- startGateway
@@ -84,16 +84,16 @@ object Main extends ZIOAppDefault {
            }
     } yield ()
 
-  private def ensureAllHealthy: ZIO[HealthCheckPort & RuntimeConfig, Throwable, Unit] =
+  private def ensureAllHealthy: ZIO[HealthCheckService & RuntimeConfig, Throwable, Unit] =
     for {
-      healthCheckPort <- ZIO.service[HealthCheckPort]
+      healthCheckPort <- ZIO.service[HealthCheckService]
       _               <- ZIO.logInfo("Running health checks...")
       attempt          = for {
                   results <- healthCheckPort.checkAllServices()
                   _       <- logHealthResults(results)
                   hasBad   = results.exists {
-                             case com.cyrelis.srag.application.types.HealthStatus.Healthy(_, _, _) => false
-                             case _                                                                => true
+                             case com.cyrelis.srag.application.model.healthcheck.HealthStatus.Healthy(_, _, _) => false
+                             case _                                                                            => true
                            }
                   _ <- ZIO.when(hasBad)(
                          ZIO.fail(new RuntimeException("Unhealthy dependencies detected. Aborting startup."))

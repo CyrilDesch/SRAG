@@ -3,12 +3,12 @@ package com.cyrelis.srag.infrastructure.resilience
 import java.util.UUID
 
 import com.cyrelis.srag.application.errors.PipelineError
-import com.cyrelis.srag.application.ports.driven.embedding.EmbedderPort
-import com.cyrelis.srag.application.ports.driven.parser.DocumentParserPort
-import com.cyrelis.srag.application.ports.driven.reranker.RerankerPort
-import com.cyrelis.srag.application.ports.driven.storage.{BlobStorePort, LexicalStorePort, VectorStorePort}
-import com.cyrelis.srag.application.ports.driven.transcription.TranscriberPort
-import com.cyrelis.srag.application.types.HealthStatus
+import com.cyrelis.srag.application.ports.EmbedderPort
+import com.cyrelis.srag.application.ports.DocumentParserPort
+import com.cyrelis.srag.application.ports.RerankerPort
+import com.cyrelis.srag.application.ports.{BlobStorePort, LexicalStorePort, VectorStorePort}
+import com.cyrelis.srag.application.ports.TranscriberPort
+import com.cyrelis.srag.application.model.healthcheck.HealthStatus
 import com.cyrelis.srag.domain.ingestionjob.{IngestionJob, IngestionJobRepository}
 import com.cyrelis.srag.domain.transcript.{Transcript, TranscriptRepository}
 import com.cyrelis.srag.infrastructure.config.{RetryConfig, TimeoutConfig}
@@ -115,8 +115,8 @@ object RetryWrappers {
     override def searchSimilar(
       queryVector: Array[Float],
       limit: Int,
-      filter: Option[com.cyrelis.srag.application.types.VectorStoreFilter]
-    ): ZIO[Any, PipelineError, List[com.cyrelis.srag.application.types.VectorSearchResult]] = {
+      filter: Option[com.cyrelis.srag.application.model.query.VectorStoreFilter]
+    ): ZIO[Any, PipelineError, List[com.cyrelis.srag.application.model.query.VectorSearchResult]] = {
       val withTimeout = TimeoutService.applyVectorStoreTimeout(
         underlying.searchSimilar(queryVector, limit, filter),
         timeoutConfig
@@ -124,8 +124,7 @@ object RetryWrappers {
       RetryService.applyRetry(withTimeout, retryConfig)
     }
 
-    override def listAllVectors()
-      : ZIO[Any, PipelineError, List[com.cyrelis.srag.application.ports.driven.storage.VectorInfo]] = {
+    override def listAllVectors(): ZIO[Any, PipelineError, List[com.cyrelis.srag.application.ports.VectorInfo]] = {
       val withTimeout = TimeoutService.applyVectorStoreTimeout(
         underlying.listAllVectors(),
         timeoutConfig
@@ -214,8 +213,7 @@ object RetryWrappers {
       RetryService.applyRetry(withTimeout, retryConfig)
     }
 
-    override def listAllBlobs()
-      : ZIO[Any, PipelineError, List[com.cyrelis.srag.application.ports.driven.storage.BlobInfo]] = {
+    override def listAllBlobs(): ZIO[Any, PipelineError, List[com.cyrelis.srag.application.ports.BlobInfo]] = {
       val withTimeout = TimeoutService.applyBlobStoreTimeout(
         underlying.listAllBlobs(),
         timeoutConfig
@@ -255,8 +253,8 @@ object RetryWrappers {
     override def search(
       queryText: String,
       limit: Int,
-      filter: Option[com.cyrelis.srag.application.types.VectorStoreFilter]
-    ): ZIO[Any, PipelineError, List[com.cyrelis.srag.application.types.LexicalSearchResult]] = {
+      filter: Option[com.cyrelis.srag.application.model.query.VectorStoreFilter]
+    ): ZIO[Any, PipelineError, List[com.cyrelis.srag.application.model.query.LexicalSearchResult]] = {
       val withTimeout = TimeoutService.applyLexicalStoreTimeout(
         underlying.search(queryText, limit, filter),
         timeoutConfig
@@ -264,8 +262,7 @@ object RetryWrappers {
       RetryService.applyRetry(withTimeout, retryConfig)
     }
 
-    override def listAllDocuments()
-      : ZIO[Any, PipelineError, List[com.cyrelis.srag.application.ports.driven.storage.DocumentInfo]] = {
+    override def listAllDocuments(): ZIO[Any, PipelineError, List[com.cyrelis.srag.application.ports.DocumentInfo]] = {
       val withTimeout = TimeoutService.applyLexicalStoreTimeout(
         underlying.listAllDocuments(),
         timeoutConfig
@@ -284,9 +281,9 @@ object RetryWrappers {
   ): RerankerPort = new RerankerPort {
     override def rerank(
       query: String,
-      candidates: List[com.cyrelis.srag.application.types.RerankerCandidate],
+      candidates: List[com.cyrelis.srag.application.model.query.RerankerCandidate],
       topK: Int
-    ): ZIO[Any, PipelineError, List[com.cyrelis.srag.application.types.RerankerResult]] = {
+    ): ZIO[Any, PipelineError, List[com.cyrelis.srag.application.model.query.RerankerResult]] = {
       val withTimeout = TimeoutService.applyRerankerTimeout(
         underlying.rerank(query, candidates, topK),
         timeoutConfig

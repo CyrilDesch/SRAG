@@ -5,13 +5,13 @@ import java.util.UUID
 import scala.jdk.CollectionConverters.*
 
 import com.cyrelis.srag.application.errors.PipelineError
-import com.cyrelis.srag.application.ports.driven.job.JobQueuePort
-import com.cyrelis.srag.application.types.HealthStatus
+import com.cyrelis.srag.application.model.healthcheck.HealthStatus
+import com.cyrelis.srag.application.ports.JobQueuePort
 import com.cyrelis.srag.infrastructure.config.JobQueueAdapterConfig
 import redis.clients.jedis.{DefaultJedisClientConfig, HostAndPort, JedisPool, JedisPoolConfig}
 import zio.*
 
-final class RedisJobQueueAdapter(
+private final class RedisJobQueueAdapter(
   pool: JedisPool,
   queueKey: String,
   processingKey: String,
@@ -200,10 +200,11 @@ final class RedisJobQueueAdapter(
 
 object RedisJobQueueAdapter {
 
-  def layerFromConfig(config: JobQueueAdapterConfig.Redis): ZLayer[Any, Throwable, JobQueuePort] =
+  val layer: ZLayer[JobQueueAdapterConfig.Redis, Throwable, JobQueuePort] =
     ZLayer.scoped {
       for {
-        pool <- ZIO.acquireRelease(
+        config <- ZIO.service[JobQueueAdapterConfig.Redis]
+        pool   <- ZIO.acquireRelease(
                   ZIO.attemptBlocking {
                     val clientCfg = DefaultJedisClientConfig
                       .builder()

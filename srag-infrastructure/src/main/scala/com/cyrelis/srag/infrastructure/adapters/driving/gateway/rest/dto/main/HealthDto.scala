@@ -1,6 +1,6 @@
 package com.cyrelis.srag.infrastructure.adapters.driving.gateway.rest.dto.main
 
-import com.cyrelis.srag.application.types.HealthStatus
+import com.cyrelis.srag.application.model.healthcheck.HealthStatus
 import io.circe.Codec
 
 final case class HealthStatusRestDto(

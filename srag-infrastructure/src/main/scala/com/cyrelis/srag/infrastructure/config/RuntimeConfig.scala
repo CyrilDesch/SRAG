@@ -2,7 +2,7 @@ package com.cyrelis.srag.infrastructure.config
 
 import scala.concurrent.duration.{FiniteDuration, MILLISECONDS}
 
-import com.cyrelis.srag.application.types.JobProcessingConfig
+import com.cyrelis.srag.application.model.ingestion.JobProcessingConfig
 import zio.*
 
 final case class RuntimeConfig(

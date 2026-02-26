@@ -1,7 +1,7 @@
 package com.cyrelis.srag.infrastructure.runtime
 
 import com.cyrelis.srag.application.errors.PipelineError
-import com.cyrelis.srag.application.ports.driven.datasource.DatasourcePort
+import com.cyrelis.srag.application.ports.DatasourcePort
 import com.cyrelis.srag.domain.ingestionjob.IngestionJobRepository
 import com.cyrelis.srag.domain.transcript.TranscriptRepository
 import com.cyrelis.srag.infrastructure.config.{AdapterFactory, RuntimeConfig}

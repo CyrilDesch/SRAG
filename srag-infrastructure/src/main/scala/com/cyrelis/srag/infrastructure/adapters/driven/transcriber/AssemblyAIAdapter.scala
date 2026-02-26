@@ -6,8 +6,8 @@ import java.util.UUID
 
 import scala.concurrent.duration.*
 
-import com.cyrelis.srag.application.ports.driven.transcription.TranscriberPort
-import com.cyrelis.srag.application.types.HealthStatus
+import com.cyrelis.srag.application.model.healthcheck.HealthStatus
+import com.cyrelis.srag.application.ports.TranscriberPort
 import com.cyrelis.srag.domain.transcript.{IngestSource, LanguageCode, Transcript, Word}
 import com.cyrelis.srag.infrastructure.config.TranscriberAdapterConfig
 import com.cyrelis.srag.infrastructure.resilience.ErrorMapper
@@ -56,13 +56,8 @@ final case class AssemblyAIWord(
   speaker: Option[String] = None
 ) derives Codec
 
-class AssemblyAIAdapter(config: TranscriberAdapterConfig.AssemblyAI) extends TranscriberPort {
-
-  private val httpClient: HttpClient =
-    HttpClient
-      .newBuilder()
-      .version(HttpClient.Version.HTTP_1_1)
-      .build()
+private final class AssemblyAIAdapter(config: TranscriberAdapterConfig.AssemblyAI, httpClient: HttpClient)
+    extends TranscriberPort {
 
   private val baseUrl = s"https://${config.apiUrl}"
   private val apiKey  = config.apiKey
@@ -385,4 +380,16 @@ class AssemblyAIAdapter(config: TranscriberAdapterConfig.AssemblyAI) extends Tra
       })
     }
   }
+}
+
+object AssemblyAIAdapter {
+  val layer: ZLayer[TranscriberAdapterConfig.AssemblyAI, Throwable, TranscriberPort] =
+    ZLayer.scoped {
+      for {
+        config <- ZIO.service[TranscriberAdapterConfig.AssemblyAI]
+        client <- ZIO.fromAutoCloseable(
+                    ZIO.attemptBlocking(HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build())
+                  )
+      } yield new AssemblyAIAdapter(config, client)
+    }
 }

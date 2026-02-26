@@ -5,6 +5,7 @@ import java.time.Instant
 import java.util.UUID
 
 import com.cyrelis.srag.application.errors.PipelineError
+import com.cyrelis.srag.application.ports.DatasourcePort
 import com.cyrelis.srag.domain.ingestionjob.{IngestionJob, IngestionJobRepository}
 import com.cyrelis.srag.infrastructure.adapters.driven.database.postgres.models.IngestionJobRow
 import com.cyrelis.srag.infrastructure.resilience.ErrorMapper
@@ -12,7 +13,17 @@ import io.getquill.*
 import io.getquill.jdbczio.Quill
 import zio.*
 
-final class PostgresJobRepository(
+object PostgresJobRepository {
+  val layer: ZLayer[DatasourcePort, Nothing, IngestionJobRepository[[X] =>> ZIO[Any, PipelineError, X]]] =
+    ZLayer {
+      for {
+        datasource  <- ZIO.service[DatasourcePort]
+        quillContext = datasource.asInstanceOf[PostgresDatasource].quillContext
+      } yield new PostgresJobRepository(quillContext)
+    }
+}
+
+private final class PostgresJobRepository(
   ctx: Quill.Postgres[SnakeCase]
 ) extends IngestionJobRepository[[X] =>> ZIO[Any, PipelineError, X]] {
 

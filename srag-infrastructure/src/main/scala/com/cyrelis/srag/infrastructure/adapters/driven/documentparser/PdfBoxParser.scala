@@ -3,11 +3,11 @@ package com.cyrelis.srag.infrastructure.adapters.driven.documentparser
 import java.util.Base64
 
 import com.cyrelis.srag.application.errors.PipelineError
-import com.cyrelis.srag.application.ports.driven.parser.DocumentParserPort
+import com.cyrelis.srag.application.ports.DocumentParserPort
 import com.cyrelis.srag.infrastructure.resilience.ErrorMapper
 import zio.*
 
-final class PdfBoxParser extends DocumentParserPort {
+private final class PdfBoxParser extends DocumentParserPort {
 
   override def parseDocument(documentContent: String, mediaType: String): ZIO[Any, PipelineError, String] =
     ErrorMapper.mapDocumentParserError {
@@ -51,4 +51,9 @@ final class PdfBoxParser extends DocumentParserPort {
       val bytes = Base64.getDecoder.decode(base64Content)
       new String(bytes, "UTF-8")
     }
+}
+
+object PdfBoxParser {
+  val layer: ZLayer[Any, Nothing, DocumentParserPort] =
+    ZLayer.succeed(new PdfBoxParser())
 }

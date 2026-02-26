@@ -6,8 +6,8 @@ import java.util.UUID
 
 import scala.concurrent.duration.*
 
-import com.cyrelis.srag.application.ports.driven.transcription.TranscriberPort
-import com.cyrelis.srag.application.types.HealthStatus
+import com.cyrelis.srag.application.model.healthcheck.HealthStatus
+import com.cyrelis.srag.application.ports.TranscriberPort
 import com.cyrelis.srag.domain.transcript.{IngestSource, LanguageCode, Transcript, Word}
 import com.cyrelis.srag.infrastructure.config.TranscriberAdapterConfig
 import com.cyrelis.srag.infrastructure.resilience.ErrorMapper
@@ -23,13 +23,8 @@ final case class WhisperResponse(
   language: Option[String]
 ) derives Codec
 
-class WhisperAdapter(config: TranscriberAdapterConfig.Whisper) extends TranscriberPort {
-
-  private val httpClient: HttpClient =
-    HttpClient
-      .newBuilder()
-      .version(HttpClient.Version.HTTP_1_1)
-      .build()
+private[transcriber] class WhisperAdapter(config: TranscriberAdapterConfig.Whisper, httpClient: HttpClient)
+    extends TranscriberPort {
 
   override def transcribe(
     audioContent: Array[Byte],
@@ -207,4 +202,16 @@ class WhisperAdapter(config: TranscriberAdapterConfig.Whisper) extends Transcrib
       })
     }
   }
+}
+
+object WhisperAdapter {
+  val layer: ZLayer[TranscriberAdapterConfig.Whisper, Throwable, TranscriberPort] =
+    ZLayer.scoped {
+      for {
+        config <- ZIO.service[TranscriberAdapterConfig.Whisper]
+        client <- ZIO.fromAutoCloseable(
+                    ZIO.attemptBlocking(HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build())
+                  )
+      } yield new WhisperAdapter(config, client)
+    }
 }

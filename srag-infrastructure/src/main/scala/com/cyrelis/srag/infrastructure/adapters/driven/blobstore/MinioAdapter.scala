@@ -7,30 +7,15 @@ import java.util.UUID
 import scala.jdk.CollectionConverters.*
 
 import com.cyrelis.srag.application.errors.PipelineError
-import com.cyrelis.srag.application.ports.driven.storage.{BlobInfo, BlobStorePort}
-import com.cyrelis.srag.application.types.HealthStatus
+import com.cyrelis.srag.application.model.healthcheck.HealthStatus
+import com.cyrelis.srag.application.ports.{BlobInfo, BlobStorePort}
+import com.cyrelis.srag.infrastructure.config.BlobStoreAdapterConfig
 import com.cyrelis.srag.infrastructure.resilience.ErrorMapper
 import io.minio.*
 import zio.*
 import zio.stream.ZStream
 
-final class MinioAdapter(host: String, port: Int, accessKey: String, secretKey: String, bucket: String)
-    extends BlobStorePort {
-
-  private val endpoint: String = s"$host:$port"
-
-  private lazy val minioClient: MinioClient =
-    try {
-      MinioClient
-        .builder()
-        .endpoint(host, port, false)
-        .credentials(accessKey, secretKey)
-        .build()
-    } catch {
-      case e: IllegalArgumentException =>
-        throw new IllegalArgumentException(s"Invalid MinIO configuration: ${e.getMessage}", e)
-      case e: Throwable => throw e
-    }
+private final class MinioAdapter(minioClient: MinioClient, endpoint: String, bucket: String) extends BlobStorePort {
 
   override def storeAudio(
     jobId: UUID,
@@ -67,8 +52,9 @@ final class MinioAdapter(host: String, port: Int, accessKey: String, secretKey: 
     ErrorMapper.mapBlobStoreError {
       for {
         inputStream <-
-          ZIO.attempt(minioClient.getObject(GetObjectArgs.builder().bucket(bucket).`object`(blobKey).build()))
-        bytes <- ZIO.attempt(inputStream.readAllBytes()).ensuring(ZIO.attempt(inputStream.close()).ignore)
+          ZIO.attemptBlocking(minioClient.getObject(GetObjectArgs.builder().bucket(bucket).`object`(blobKey).build()))
+        bytes <-
+          ZIO.attemptBlocking(inputStream.readAllBytes()).ensuring(ZIO.attemptBlocking(inputStream.close()).ignore)
       } yield bytes
     }
 
@@ -76,7 +62,7 @@ final class MinioAdapter(host: String, port: Int, accessKey: String, secretKey: 
     ZStream
       .fromZIO(
         ErrorMapper.mapBlobStoreError(
-          ZIO.attempt(minioClient.getObject(GetObjectArgs.builder().bucket(bucket).`object`(blobKey).build()))
+          ZIO.attemptBlocking(minioClient.getObject(GetObjectArgs.builder().bucket(bucket).`object`(blobKey).build()))
         )
       )
       .flatMap(inputStream =>
@@ -88,7 +74,7 @@ final class MinioAdapter(host: String, port: Int, accessKey: String, secretKey: 
 
   override def getBlobFilename(blobKey: String): ZIO[Any, PipelineError, Option[String]] =
     ErrorMapper.mapBlobStoreError {
-      ZIO.attempt {
+      ZIO.attemptBlocking {
         val statObjectResponse = minioClient.statObject(
           StatObjectArgs.builder().bucket(bucket).`object`(blobKey).build()
         )
@@ -104,7 +90,7 @@ final class MinioAdapter(host: String, port: Int, accessKey: String, secretKey: 
 
   override def getBlobContentType(blobKey: String): ZIO[Any, PipelineError, Option[String]] =
     ErrorMapper.mapBlobStoreError {
-      ZIO.attempt {
+      ZIO.attemptBlocking {
         val statObjectResponse = minioClient.statObject(
           StatObjectArgs.builder().bucket(bucket).`object`(blobKey).build()
         )
@@ -122,12 +108,14 @@ final class MinioAdapter(host: String, port: Int, accessKey: String, secretKey: 
 
   override def deleteBlob(blobKey: String): ZIO[Any, PipelineError, Unit] =
     ErrorMapper.mapBlobStoreError {
-      ZIO.attempt(minioClient.removeObject(RemoveObjectArgs.builder().bucket(bucket).`object`(blobKey).build())).unit
+      ZIO
+        .attemptBlocking(minioClient.removeObject(RemoveObjectArgs.builder().bucket(bucket).`object`(blobKey).build()))
+        .unit
     }
 
   override def listAllBlobs(): ZIO[Any, PipelineError, List[BlobInfo]] =
     ErrorMapper.mapBlobStoreError {
-      ZIO.attempt {
+      ZIO.attemptBlocking {
         val objects = minioClient.listObjects(
           ListObjectsArgs.builder().bucket(bucket).recursive(true).build()
         )
@@ -186,8 +174,9 @@ final class MinioAdapter(host: String, port: Int, accessKey: String, secretKey: 
     }
 
   override def healthCheck(): Task[HealthStatus] =
-    (ZIO.attempt(minioClient.listBuckets()) catchAll { t =>
+    (ZIO.attemptBlocking(minioClient.listBuckets()) catchAll { t =>
       ZIO.fail(t)
+
     }).map { _ =>
       HealthStatus.Healthy(
         serviceName = s"MinIO($endpoint)",
@@ -211,7 +200,7 @@ final class MinioAdapter(host: String, port: Int, accessKey: String, secretKey: 
     contentType: String,
     metadata: java.util.Map[String, String]
   ): Task[Unit] =
-    ZIO.attempt {
+    ZIO.attemptBlocking {
       val inputStream = ByteArrayInputStream(content)
       minioClient.putObject(
         PutObjectArgs
@@ -226,4 +215,25 @@ final class MinioAdapter(host: String, port: Int, accessKey: String, secretKey: 
       inputStream.close()
     }
 
+}
+
+object MinioAdapter {
+  val layer: ZLayer[BlobStoreAdapterConfig.MinIO, Throwable, BlobStorePort] =
+    ZLayer.scoped {
+      for {
+        config <- ZIO.service[BlobStoreAdapterConfig.MinIO]
+        client <- ZIO.acquireRelease {
+                    ZIO.attemptBlocking {
+                      MinioClient
+                        .builder()
+                        .endpoint(config.host, config.port, false)
+                        .credentials(config.accessKey, config.secretKey)
+                        .build()
+                    }
+                  } { _ =>
+                    // MinioClient does not have a close mechanism, but if it did, it would be called here.
+                    ZIO.unit
+                  }
+      } yield new MinioAdapter(client, s"${config.host}:${config.port}", config.bucket)
+    }
 }

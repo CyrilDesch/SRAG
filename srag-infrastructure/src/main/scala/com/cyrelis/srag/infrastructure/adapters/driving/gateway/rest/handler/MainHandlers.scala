@@ -5,9 +5,11 @@ import java.util.UUID
 
 import com.cyrelis.srag.application.errors.PipelineError
 import com.cyrelis.srag.application.errors.PipelineError.ConfigurationError
-import com.cyrelis.srag.application.ports.driven.storage.BlobStorePort
-import com.cyrelis.srag.application.ports.driving.{HealthCheckPort, IngestPort, QueryPort}
-import com.cyrelis.srag.application.types.VectorStoreFilter
+import com.cyrelis.srag.application.ports.BlobStorePort
+import com.cyrelis.srag.application.usecases.healthcheck.HealthCheckService
+import com.cyrelis.srag.application.usecases.ingestion.IngestService
+import com.cyrelis.srag.application.usecases.query.QueryService
+import com.cyrelis.srag.application.model.query.VectorStoreFilter
 import com.cyrelis.srag.domain.transcript.TranscriptRepository
 import com.cyrelis.srag.infrastructure.adapters.driving.gateway.rest.dto.main.*
 import com.cyrelis.srag.infrastructure.adapters.driving.gateway.rest.error.ErrorHandler
@@ -16,13 +18,13 @@ import zio.stream.ZStream
 
 object MainHandlers {
 
-  def handleHealth: ZIO[HealthCheckPort, String, List[HealthStatusRestDto]] =
+  def handleHealth: ZIO[HealthCheckService, String, List[HealthStatusRestDto]] =
     ZIO
-      .serviceWithZIO[HealthCheckPort](_.checkAllServices())
+      .serviceWithZIO[HealthCheckService](_.checkAllServices())
       .map(_.map(HealthStatusRestDto.fromDomain))
       .mapError(_.getMessage)
 
-  def handleIngestAudio(req: AudioIngestMultipartDto): ZIO[IngestPort, String, JobAcceptedRestDto] =
+  def handleIngestAudio(req: AudioIngestMultipartDto): ZIO[IngestService, String, JobAcceptedRestDto] =
     (for {
       mediaContentType <- ZIO
                             .fromOption(req.file.contentType.map(_.toString))
@@ -32,30 +34,30 @@ object MainHandlers {
                     .orElseFail(ConfigurationError("Missing filename in multipart request"))
       audioBytes <- ZIO.attempt(Files.readAllBytes(req.file.body.toPath))
       job        <-
-        ZIO.serviceWithZIO[IngestPort](
+        ZIO.serviceWithZIO[IngestService](
           _.submitAudio(audioBytes, mediaContentType, fileName, req.metadata)
         )
     } yield JobAcceptedRestDto.fromDomain(job)).mapError(ErrorHandler.errorToString)
 
-  def handleIngestText(req: TextIngestRestDto): ZIO[IngestPort, String, JobAcceptedRestDto] =
+  def handleIngestText(req: TextIngestRestDto): ZIO[IngestService, String, JobAcceptedRestDto] =
     ZIO
-      .serviceWithZIO[IngestPort](_.submitText(req.content, Map.empty))
+      .serviceWithZIO[IngestService](_.submitText(req.content, Map.empty))
       .map(JobAcceptedRestDto.fromDomain)
       .mapError(ErrorHandler.errorToString)
 
-  def handleIngestDocument(req: DocumentIngestRestDto): ZIO[IngestPort, String, JobAcceptedRestDto] =
+  def handleIngestDocument(req: DocumentIngestRestDto): ZIO[IngestService, String, JobAcceptedRestDto] =
     ZIO
-      .serviceWithZIO[IngestPort](_.submitDocument(req.content, req.mediaType, Map.empty))
+      .serviceWithZIO[IngestService](_.submitDocument(req.content, req.mediaType, Map.empty))
       .map(JobAcceptedRestDto.fromDomain)
       .mapError(ErrorHandler.errorToString)
 
-  def handleGetJobStatus(jobId: String): ZIO[IngestPort, String, JobStatusRestDto] =
+  def handleGetJobStatus(jobId: String): ZIO[IngestService, String, JobStatusRestDto] =
     (for {
       parsedId <-
         ZIO
           .attempt(UUID.fromString(jobId))
           .mapError(_ => com.cyrelis.srag.application.errors.PipelineError.ConfigurationError("Invalid job id"))
-      jobOpt <- ZIO.serviceWithZIO[IngestPort](_.getJob(parsedId))
+      jobOpt <- ZIO.serviceWithZIO[IngestService](_.getJob(parsedId))
       job    <- ZIO
                .fromOption(jobOpt)
                .orElseFail(
@@ -122,9 +124,9 @@ object MainHandlers {
       (contentDisposition, contentType, stream)
     }).mapError(ErrorHandler.errorToString)
 
-  def handleQuery(req: QueryRequestDto): ZIO[QueryPort, String, List[QueryResponseDto]] =
+  def handleQuery(req: QueryRequestDto): ZIO[QueryService, String, List[QueryResponseDto]] =
     (for {
-      queryPort <- ZIO.service[QueryPort]
+      queryPort <- ZIO.service[QueryService]
       filter     = req.metadata.map(VectorStoreFilter.apply)
       limit      = req.limit.getOrElse(5)
       segments  <-

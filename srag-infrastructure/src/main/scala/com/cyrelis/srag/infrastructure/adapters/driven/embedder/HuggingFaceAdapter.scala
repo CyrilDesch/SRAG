@@ -5,8 +5,8 @@ import java.time.Instant
 
 import scala.concurrent.duration.*
 
-import com.cyrelis.srag.application.ports.driven.embedding.EmbedderPort
-import com.cyrelis.srag.application.types.HealthStatus
+import com.cyrelis.srag.application.model.healthcheck.HealthStatus
+import com.cyrelis.srag.application.ports.EmbedderPort
 import com.cyrelis.srag.domain.transcript.Transcript
 import com.cyrelis.srag.infrastructure.config.EmbedderAdapterConfig
 import com.cyrelis.srag.infrastructure.resilience.ErrorMapper
@@ -20,13 +20,8 @@ import zio.*
 
 final case class HuggingFaceResponse(text: String, vector: List[Float], dim: Int) derives Codec
 
-class HuggingFaceAdapter(config: EmbedderAdapterConfig.HuggingFace) extends EmbedderPort {
-
-  private val httpClient: HttpClient =
-    HttpClient
-      .newBuilder()
-      .version(HttpClient.Version.HTTP_1_1)
-      .build()
+private[embedder] class HuggingFaceAdapter(config: EmbedderAdapterConfig.HuggingFace, httpClient: HttpClient)
+    extends EmbedderPort {
 
   private val serviceName = s"HuggingFaceEmbedder(${config.model})"
 
@@ -154,6 +149,15 @@ class HuggingFaceAdapter(config: EmbedderAdapterConfig.HuggingFace) extends Embe
 }
 
 object HuggingFaceAdapter {
-  def apply(config: EmbedderAdapterConfig.HuggingFace): HuggingFaceAdapter =
-    new HuggingFaceAdapter(config)
+  val layer: ZLayer[EmbedderAdapterConfig.HuggingFace, Throwable, EmbedderPort] =
+    ZLayer.scoped {
+      for {
+        config <- ZIO.service[EmbedderAdapterConfig.HuggingFace]
+        client <- ZIO.fromAutoCloseable(
+                    ZIO.attemptBlocking(
+                      HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build()
+                    )
+                  )
+      } yield new HuggingFaceAdapter(config, client)
+    }
 }

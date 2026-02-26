@@ -7,8 +7,9 @@ import java.util.UUID
 import scala.concurrent.duration.*
 
 import com.cyrelis.srag.application.errors.PipelineError
-import com.cyrelis.srag.application.ports.driven.storage.{VectorInfo, VectorStorePort}
-import com.cyrelis.srag.application.types.{HealthStatus, VectorSearchResult, VectorStoreFilter}
+import com.cyrelis.srag.application.model.healthcheck.HealthStatus
+import com.cyrelis.srag.application.model.query.{VectorSearchResult, VectorStoreFilter}
+import com.cyrelis.srag.application.ports.{VectorInfo, VectorStorePort}
 import com.cyrelis.srag.infrastructure.config.VectorStoreAdapterConfig
 import com.cyrelis.srag.infrastructure.resilience.ErrorMapper
 import io.circe.Codec
@@ -41,13 +42,8 @@ final case class QdrantSearchResult(id: String, score: Double, payload: Option[M
 
 final case class QdrantSearchResponse(result: List[QdrantSearchResult]) derives Codec
 
-final class QdrantAdapter(config: VectorStoreAdapterConfig.Qdrant) extends VectorStorePort {
-
-  private val httpClient: HttpClient =
-    HttpClient
-      .newBuilder()
-      .version(HttpClient.Version.HTTP_1_1)
-      .build()
+private final class QdrantAdapter(config: VectorStoreAdapterConfig.Qdrant, httpClient: HttpClient)
+    extends VectorStorePort {
 
   private val serviceName = s"Qdrant(${config.collection})"
 
@@ -352,6 +348,13 @@ final class QdrantAdapter(config: VectorStoreAdapterConfig.Qdrant) extends Vecto
 }
 
 object QdrantAdapter {
-  def apply(config: VectorStoreAdapterConfig.Qdrant): QdrantAdapter =
-    new QdrantAdapter(config)
+  val layer: ZLayer[VectorStoreAdapterConfig.Qdrant, Throwable, VectorStorePort] =
+    ZLayer.scoped {
+      for {
+        config <- ZIO.service[VectorStoreAdapterConfig.Qdrant]
+        client <- ZIO.fromAutoCloseable(
+                    ZIO.attemptBlocking(HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build())
+                  )
+      } yield new QdrantAdapter(config, client)
+    }
 }

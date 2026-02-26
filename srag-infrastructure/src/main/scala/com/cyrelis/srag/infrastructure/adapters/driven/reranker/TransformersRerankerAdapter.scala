@@ -7,8 +7,9 @@ import scala.collection.mutable
 import scala.concurrent.duration.*
 
 import com.cyrelis.srag.application.errors.PipelineError
-import com.cyrelis.srag.application.ports.driven.reranker.RerankerPort
-import com.cyrelis.srag.application.types.{HealthStatus, RerankerCandidate, RerankerResult}
+import com.cyrelis.srag.application.model.healthcheck.HealthStatus
+import com.cyrelis.srag.application.model.query.{RerankerCandidate, RerankerResult}
+import com.cyrelis.srag.application.ports.RerankerPort
 import com.cyrelis.srag.infrastructure.config.RerankerAdapterConfig
 import com.cyrelis.srag.infrastructure.resilience.ErrorMapper
 import io.circe.Codec
@@ -25,13 +26,8 @@ final case class TransformersRerankDocumentScore(document: String, score: Double
 final case class TransformersRerankResponse(query: String, scores: Option[List[TransformersRerankDocumentScore]])
     derives Codec
 
-class TransformersRerankerAdapter(config: RerankerAdapterConfig.Transformers) extends RerankerPort {
-
-  private val httpClient: HttpClient =
-    HttpClient
-      .newBuilder()
-      .version(HttpClient.Version.HTTP_1_1)
-      .build()
+private final class TransformersRerankerAdapter(config: RerankerAdapterConfig.Transformers, httpClient: HttpClient)
+    extends RerankerPort {
 
   private val serviceName = s"TransformersReranker(${config.model})"
 
@@ -137,6 +133,15 @@ class TransformersRerankerAdapter(config: RerankerAdapterConfig.Transformers) ex
 }
 
 object TransformersRerankerAdapter {
-  def apply(config: RerankerAdapterConfig.Transformers): TransformersRerankerAdapter =
-    new TransformersRerankerAdapter(config)
+  val layer: ZLayer[RerankerAdapterConfig.Transformers, Throwable, RerankerPort] =
+    ZLayer.scoped {
+      for {
+        config <- ZIO.service[RerankerAdapterConfig.Transformers]
+        client <- ZIO.fromAutoCloseable(
+                    ZIO.attemptBlocking(
+                      HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build()
+                    )
+                  )
+      } yield new TransformersRerankerAdapter(config, client)
+    }
 }
