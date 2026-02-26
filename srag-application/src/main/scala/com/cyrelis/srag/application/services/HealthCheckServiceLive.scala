@@ -10,7 +10,7 @@ import com.cyrelis.srag.application.ports.driving.HealthCheckPort
 import com.cyrelis.srag.application.types.HealthStatus
 import zio.*
 
-final class DefaultHealthCheckService(
+final class HealthCheckServiceLive(
   transcriber: TranscriberPort,
   embedder: EmbedderPort,
   datasource: DatasourcePort,

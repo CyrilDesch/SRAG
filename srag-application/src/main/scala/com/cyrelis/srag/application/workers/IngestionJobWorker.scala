@@ -19,7 +19,7 @@ import com.cyrelis.srag.domain.ingestionjob.{IngestionJob, IngestionJobRepositor
 import com.cyrelis.srag.domain.transcript.IngestSource
 import zio.*
 
-final class DefaultIngestionJobWorker(
+final class IngestionJobWorker(
   jobRepository: IngestionJobRepository[[X] =>> ZIO[Any, PipelineError, X]],
   blobStore: BlobStorePort,
   audioPreparator: AudioSourcePreparator,

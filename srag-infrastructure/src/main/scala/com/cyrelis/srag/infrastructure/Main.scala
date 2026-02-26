@@ -4,7 +4,7 @@ import com.cyrelis.srag.application.ports.driven.job.JobQueuePort
 import com.cyrelis.srag.application.ports.driven.job.JobQueuePort.LockExpirationSeconds
 import com.cyrelis.srag.application.ports.driving.HealthCheckPort
 import com.cyrelis.srag.application.types.HealthStatus
-import com.cyrelis.srag.application.workers.DefaultIngestionJobWorker
+import com.cyrelis.srag.application.workers.IngestionJobWorker
 import com.cyrelis.srag.infrastructure.adapters.driving.Gateway
 import com.cyrelis.srag.infrastructure.config.{ConfigLoader, RuntimeConfig}
 import com.cyrelis.srag.infrastructure.migration.MigrationRunner
@@ -40,7 +40,7 @@ object Main extends ZIOAppDefault {
         _      <- runMigrations
         _      <- ensureAllHealthy
         _      <- recoverAbandonedJobsAfterDelay.forkDaemon
-        worker <- ZIO.service[DefaultIngestionJobWorker]
+        worker <- ZIO.service[IngestionJobWorker]
         _      <- ZIO.logInfo("Starting ingestion job worker...")
         _      <- worker.run.forkScoped
         _      <- startGateway

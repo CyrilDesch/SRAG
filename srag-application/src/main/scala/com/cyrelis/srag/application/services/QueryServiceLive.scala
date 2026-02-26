@@ -18,7 +18,7 @@ import com.cyrelis.srag.application.types.{
 import com.cyrelis.srag.domain.transcript.TranscriptRepository
 import zio.*
 
-final class DefaultQueryService(
+final class QueryServiceLive(
   embedder: EmbedderPort,
   vectorStore: VectorStorePort,
   lexicalStore: LexicalStorePort,
@@ -169,7 +169,7 @@ final class DefaultQueryService(
     transcripts: List[com.cyrelis.srag.domain.transcript.Transcript]
   ): Map[CandidateKey, String] =
     transcripts.flatMap { transcript =>
-      val chunks = DefaultQueryService.TextChunker.chunkText(transcript.text, 1000)
+      val chunks = QueryPort.TextChunker.chunkText(transcript.text, 1000)
       chunks.zipWithIndex.map { case (chunk, idx) => (transcript.id -> idx) -> chunk }
     }.toMap
 
@@ -180,14 +180,4 @@ final class DefaultQueryService(
       text = result.candidate.text,
       score = result.score
     )
-}
-
-object DefaultQueryService {
-
-  object TextChunker {
-    def chunkText(text: String, chunkSize: Int): List[String] = {
-      val words = text.split("\\s+").toList
-      words.grouped(chunkSize).map(_.mkString(" ")).toList
-    }
-  }
 }

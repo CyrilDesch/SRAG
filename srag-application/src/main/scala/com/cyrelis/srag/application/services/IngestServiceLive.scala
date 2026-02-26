@@ -12,7 +12,7 @@ import com.cyrelis.srag.domain.ingestionjob.{IngestionJob, IngestionJobRepositor
 import com.cyrelis.srag.domain.transcript.IngestSource
 import zio.{Clock, ZIO}
 
-final class DefaultIngestService(
+final class IngestServiceLive(
   blobStore: BlobStorePort,
   jobRepository: IngestionJobRepository[[X] =>> ZIO[Any, PipelineError, X]],
   jobConfig: JobProcessingConfig,
