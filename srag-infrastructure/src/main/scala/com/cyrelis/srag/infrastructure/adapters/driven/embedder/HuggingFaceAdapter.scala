@@ -9,7 +9,6 @@ import com.cyrelis.srag.application.model.healthcheck.HealthStatus
 import com.cyrelis.srag.application.ports.EmbedderPort
 import com.cyrelis.srag.domain.transcript.Transcript
 import com.cyrelis.srag.infrastructure.config.EmbedderAdapterConfig
-import com.cyrelis.srag.infrastructure.resilience.ErrorMapper
 import io.circe.Codec
 import io.circe.parser.*
 import io.circe.syntax.*
@@ -20,15 +19,17 @@ import zio.*
 
 final case class HuggingFaceResponse(text: String, vector: List[Float], dim: Int) derives Codec
 
-private[embedder] class HuggingFaceAdapter(config: EmbedderAdapterConfig.HuggingFace, httpClient: HttpClient)
-    extends EmbedderPort {
+private[embedder] class HuggingFaceAdapter(
+  config: EmbedderAdapterConfig.HuggingFace,
+  httpClient: HttpClient
+) extends EmbedderPort {
 
   private val serviceName = s"HuggingFaceEmbedder(${config.model})"
 
   override def embed(
     transcript: Transcript
-  ): ZIO[Any, com.cyrelis.srag.application.errors.PipelineError, List[(String, Array[Float])]] =
-    ErrorMapper.mapEmbeddingError {
+  ): ZIO[Any, com.cyrelis.srag.application.errors.PipelineError, List[(String, Array[Float])]] = {
+    val effect = {
       val chunks = TextChunker.chunkText(transcript.text, 1000)
 
       if chunks.isEmpty then ZIO.succeed(List.empty)
@@ -40,16 +41,23 @@ private[embedder] class HuggingFaceAdapter(config: EmbedderAdapterConfig.Hugging
           } yield (chunk, embedding)
         }
     }
+    effect.mapError(error =>
+      com.cyrelis.srag.application.errors.PipelineError.EmbeddingError(error.getMessage, Some(error))
+    )
+  }
 
   override def embedQuery(
     query: String
-  ): ZIO[Any, com.cyrelis.srag.application.errors.PipelineError, Array[Float]] =
-    ErrorMapper.mapEmbeddingError {
+  ): ZIO[Any, com.cyrelis.srag.application.errors.PipelineError, Array[Float]] = {
+    val effect =
       for {
         response  <- makeEmbeddingRequest(query)
         embedding <- parseEmbeddingResponse(response)
       } yield embedding
-    }
+    effect.mapError(error =>
+      com.cyrelis.srag.application.errors.PipelineError.EmbeddingError(error.getMessage, Some(error))
+    )
+  }
 
   protected def makeEmbeddingRequest(text: String): Task[Response[String]] = {
     val url = uri"${config.apiUrl}/vectors"

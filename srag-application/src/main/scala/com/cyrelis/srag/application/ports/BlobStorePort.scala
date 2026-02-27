@@ -29,7 +29,6 @@ trait BlobStorePort {
   def getBlobFilename(blobKey: String): ZIO[Any, PipelineError, Option[String]]
   def getBlobContentType(blobKey: String): ZIO[Any, PipelineError, Option[String]]
   def deleteBlob(blobKey: String): ZIO[Any, PipelineError, Unit]
-  def storeDocument(jobId: UUID, documentContent: String, mediaType: String): ZIO[Any, PipelineError, String]
   def listAllBlobs(): ZIO[Any, PipelineError, List[BlobInfo]]
   def healthCheck(): Task[HealthStatus]
 }

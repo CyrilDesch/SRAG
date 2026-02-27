@@ -3,12 +3,11 @@ package com.cyrelis.srag.application.usecases.ingestion
 import java.util.UUID
 
 import com.cyrelis.srag.application.errors.PipelineError
-import com.cyrelis.srag.application.errors.PipelineError.ConfigurationError
 import com.cyrelis.srag.application.model.ingestion.JobProcessingConfig
 import com.cyrelis.srag.application.ports.{BlobStorePort, JobQueuePort}
 import com.cyrelis.srag.domain.ingestionjob.{IngestionJob, IngestionJobRepository, JobStatus}
 import com.cyrelis.srag.domain.transcript.IngestSource
-import zio.{Clock, ZIO, ZLayer}
+import zio.*
 
 trait IngestService {
   def submitAudio(
@@ -18,11 +17,6 @@ trait IngestService {
     metadata: Map[String, String]
   ): ZIO[Any, PipelineError, IngestionJob]
   def submitText(textContent: String, metadata: Map[String, String]): ZIO[Any, PipelineError, IngestionJob]
-  def submitDocument(
-    documentContent: String,
-    mediaType: String,
-    metadata: Map[String, String]
-  ): ZIO[Any, PipelineError, IngestionJob]
   def getJob(jobId: UUID): ZIO[Any, PipelineError, Option[IngestionJob]]
 }
 
@@ -54,6 +48,22 @@ object IngestService {
     jobQueue: JobQueuePort
   ) extends IngestService {
 
+    private val blobStoreTimeout = 15.seconds
+    private val databaseTimeout  = 5.seconds
+    private val queueTimeout     = 5.seconds
+
+    private val blobStoreRetrySchedule =
+      Schedule.exponential(100.millis, 2.0).modifyDelay((_, d) => if (d > 5.seconds) 5.seconds else d) &&
+        Schedule.recurs(2)
+
+    private val databaseRetrySchedule =
+      Schedule.exponential(100.millis, 2.0).modifyDelay((_, d) => if (d > 5.seconds) 5.seconds else d) &&
+        Schedule.recurs(2)
+
+    private val queueRetrySchedule =
+      Schedule.exponential(100.millis, 2.0).modifyDelay((_, d) => if (d > 5.seconds) 5.seconds else d) &&
+        Schedule.recurs(2)
+
     override def submitAudio(
       audioContent: Array[Byte],
       mediaContentType: String,
@@ -63,8 +73,16 @@ object IngestService {
       for {
         now     <- Clock.instant
         jobId    = UUID.randomUUID()
-        blobKey <- blobStore.storeAudio(jobId, audioContent, mediaContentType, mediaFilename)
-        job      = IngestionJob(
+        blobKey <- blobStore
+                     .storeAudio(jobId, audioContent, mediaContentType, mediaFilename)
+                     .timeoutFail(
+                       PipelineError.TimeoutError(
+                         operation = s"ingest.submit_audio.store_blob.$jobId",
+                         timeoutMs = blobStoreTimeout.toMillis
+                       )
+                     )(blobStoreTimeout)
+                     .retry(blobStoreRetrySchedule)
+        job = IngestionJob(
                 id = jobId,
                 transcriptId = None,
                 source = IngestSource.Audio,
@@ -79,8 +97,24 @@ object IngestService {
                 createdAt = now,
                 updatedAt = now
               )
-        persisted <- jobRepository.create(job)
-        _         <- jobQueue.enqueue(job.id)
+        persisted <- jobRepository
+                       .create(job)
+                       .timeoutFail(
+                         PipelineError.TimeoutError(
+                           operation = s"ingest.submit_audio.persist_job.$jobId",
+                           timeoutMs = databaseTimeout.toMillis
+                         )
+                       )(databaseTimeout)
+                       .retry(databaseRetrySchedule)
+        _ <- jobQueue
+               .enqueue(job.id)
+               .timeoutFail(
+                 PipelineError.TimeoutError(
+                   operation = s"ingest.submit_audio.enqueue_job.${job.id}",
+                   timeoutMs = queueTimeout.toMillis
+                 )
+               )(queueTimeout)
+               .retry(queueRetrySchedule)
       } yield persisted
 
     override def submitText(
@@ -90,8 +124,16 @@ object IngestService {
       for {
         now     <- Clock.instant
         jobId    = UUID.randomUUID()
-        blobKey <- blobStore.storeText(jobId, textContent)
-        job      = IngestionJob(
+        blobKey <- blobStore
+                     .storeText(jobId, textContent)
+                     .timeoutFail(
+                       PipelineError.TimeoutError(
+                         operation = s"ingest.submit_text.store_blob.$jobId",
+                         timeoutMs = blobStoreTimeout.toMillis
+                       )
+                     )(blobStoreTimeout)
+                     .retry(blobStoreRetrySchedule)
+        job = IngestionJob(
                 id = jobId,
                 transcriptId = None,
                 source = IngestSource.Text,
@@ -106,18 +148,35 @@ object IngestService {
                 createdAt = now,
                 updatedAt = now
               )
-        persisted <- jobRepository.create(job)
-        _         <- jobQueue.enqueue(job.id)
+        persisted <- jobRepository
+                       .create(job)
+                       .timeoutFail(
+                         PipelineError.TimeoutError(
+                           operation = s"ingest.submit_text.persist_job.$jobId",
+                           timeoutMs = databaseTimeout.toMillis
+                         )
+                       )(databaseTimeout)
+                       .retry(databaseRetrySchedule)
+        _ <- jobQueue
+               .enqueue(job.id)
+               .timeoutFail(
+                 PipelineError.TimeoutError(
+                   operation = s"ingest.submit_text.enqueue_job.${job.id}",
+                   timeoutMs = queueTimeout.toMillis
+                 )
+               )(queueTimeout)
+               .retry(queueRetrySchedule)
       } yield persisted
 
-    override def submitDocument(
-      documentContent: String,
-      mediaType: String,
-      metadata: Map[String, String]
-    ): ZIO[Any, PipelineError, IngestionJob] =
-      ZIO.fail(ConfigurationError("Document ingestion is not yet supported in async mode"))
-
     override def getJob(jobId: UUID): ZIO[Any, PipelineError, Option[IngestionJob]] =
-      jobRepository.findById(jobId)
+      jobRepository
+        .findById(jobId)
+        .timeoutFail(
+          PipelineError.TimeoutError(
+            operation = s"ingest.get_job.$jobId",
+            timeoutMs = databaseTimeout.toMillis
+          )
+        )(databaseTimeout)
+        .retry(databaseRetrySchedule)
   }
 }

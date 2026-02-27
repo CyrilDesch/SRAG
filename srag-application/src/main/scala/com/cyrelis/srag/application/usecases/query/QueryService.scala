@@ -70,15 +70,61 @@ object QueryService {
     private val minAcceptableGap       = 0.5 // Minimum score difference to consider results discriminated
     private val minAbsoluteScore       = 0.3 // Minimum absolute score for top result (0.3 on 0-1 scale)
 
+    private val embeddingTimeout    = 30.seconds
+    private val vectorStoreTimeout  = 10.seconds
+    private val lexicalStoreTimeout = 10.seconds
+    private val rerankerTimeout     = 15.seconds
+    private val databaseTimeout     = 5.seconds
+
+    private val embeddingRetrySchedule =
+      Schedule.exponential(100.millis, 2.0).modifyDelay((_, d) => if (d > 5.seconds) 5.seconds else d) &&
+        Schedule.recurs(2)
+    private val vectorStoreRetrySchedule =
+      Schedule.exponential(100.millis, 2.0).modifyDelay((_, d) => if (d > 5.seconds) 5.seconds else d) &&
+        Schedule.recurs(2)
+    private val lexicalStoreRetrySchedule =
+      Schedule.exponential(100.millis, 2.0).modifyDelay((_, d) => if (d > 5.seconds) 5.seconds else d) &&
+        Schedule.recurs(2)
+    private val rerankerRetrySchedule =
+      Schedule.exponential(100.millis, 2.0).modifyDelay((_, d) => if (d > 5.seconds) 5.seconds else d) &&
+        Schedule.recurs(1)
+    private val databaseRetrySchedule =
+      Schedule.exponential(100.millis, 2.0).modifyDelay((_, d) => if (d > 5.seconds) 5.seconds else d) &&
+        Schedule.recurs(2)
+
     override def retrieveContext(
       queryText: String,
       filter: Option[VectorStoreFilter],
       limit: Int = 5
     ): ZIO[Any, PipelineError, List[ContextSegment]] =
       for {
-        queryVector     <- embedder.embedQuery(queryText)
-        semanticResults <- vectorStore.searchSimilar(queryVector, fusionPoolSize, filter)
-        lexicalResults  <- lexicalStore.search(queryText, fusionPoolSize, filter)
+        queryVector <- embedder
+                         .embedQuery(queryText)
+                         .timeoutFail(
+                           PipelineError.TimeoutError(
+                             operation = "query.embed_query",
+                             timeoutMs = embeddingTimeout.toMillis
+                           )
+                         )(embeddingTimeout)
+                         .retry(embeddingRetrySchedule)
+        semanticResults <- vectorStore
+                             .searchSimilar(queryVector, fusionPoolSize, filter)
+                             .timeoutFail(
+                               PipelineError.TimeoutError(
+                                 operation = "query.vector_search",
+                                 timeoutMs = vectorStoreTimeout.toMillis
+                               )
+                             )(vectorStoreTimeout)
+                             .retry(vectorStoreRetrySchedule)
+        lexicalResults <- lexicalStore
+                            .search(queryText, fusionPoolSize, filter)
+                            .timeoutFail(
+                              PipelineError.TimeoutError(
+                                operation = "query.lexical_search",
+                                timeoutMs = lexicalStoreTimeout.toMillis
+                              )
+                            )(lexicalStoreTimeout)
+                            .retry(lexicalStoreRetrySchedule)
 
         fusedCandidates = fuseCandidates(semanticResults, lexicalResults)
 
@@ -130,7 +176,18 @@ object QueryService {
 
       for {
         transcripts <- ZIO
-                         .foreach(transcriptIds)(id => transcriptRepository.getById(id).map(_.map(id -> _)))
+                         .foreach(transcriptIds)(id =>
+                           transcriptRepository
+                             .getById(id)
+                             .timeoutFail(
+                               PipelineError.TimeoutError(
+                                 operation = s"query.fetch_transcript.$id",
+                                 timeoutMs = databaseTimeout.toMillis
+                               )
+                             )(databaseTimeout)
+                             .retry(databaseRetrySchedule)
+                             .map(_.map(id -> _))
+                         )
         transcriptMap        = transcripts.collect { case Some(value) => value }.toMap
         chunkIndex           = buildChunkIndex(transcriptMap.values.toList)
         lexicalIndex         = lexicalResults.map(result => ((result.transcriptId, result.segmentIndex), result.text)).toMap
@@ -157,6 +214,13 @@ object QueryService {
                          val rerankTopK     = math.min(rerankerPoolSize, candidatesOnly.size)
                          reranker
                            .rerank(queryText, candidatesOnly, rerankTopK)
+                           .timeoutFail(
+                             PipelineError.TimeoutError(
+                               operation = "query.rerank",
+                               timeoutMs = rerankerTimeout.toMillis
+                             )
+                           )(rerankerTimeout)
+                           .retry(rerankerRetrySchedule)
                            .either
                            .flatMap {
                              case Right(reranked) if reranked.nonEmpty =>

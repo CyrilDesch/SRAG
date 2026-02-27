@@ -52,11 +52,33 @@ object IngestionWorker {
     jobQueue: JobQueuePort
   ) extends IngestionWorker {
 
+    private val databaseTimeout  = 5.seconds
+    private val queueTimeout     = 5.seconds
+    private val blobStoreTimeout = 15.seconds
+    private val claimTimeout     = zio.Duration.fromMillis(jobConfig.pollInterval.toMillis + 5000L)
+
+    private val databaseRetrySchedule =
+      Schedule.exponential(100.millis, 2.0).modifyDelay((_, d) => if (d > 5.seconds) 5.seconds else d) &&
+        Schedule.recurs(2)
+    private val queueRetrySchedule =
+      Schedule.exponential(100.millis, 2.0).modifyDelay((_, d) => if (d > 5.seconds) 5.seconds else d) &&
+        Schedule.recurs(2)
+    private val blobStoreRetrySchedule =
+      Schedule.exponential(100.millis, 2.0).modifyDelay((_, d) => if (d > 5.seconds) 5.seconds else d) &&
+        Schedule.recurs(2)
+
     override def run: ZIO[Any, Nothing, Unit] =
       Semaphore.make(jobConfig.maxConcurrentJobs.toLong).flatMap { semaphore =>
         (for {
           jobOpt <- jobQueue
                       .claim(blockingTimeoutSec = jobConfig.pollInterval.toSeconds.toInt)
+                      .timeoutFail(
+                        PipelineError.TimeoutError(
+                          operation = "worker.claim_job",
+                          timeoutMs = claimTimeout.toMillis
+                        )
+                      )(claimTimeout)
+                      .retry(queueRetrySchedule)
                       .catchAll(err => ZIO.logWarning(s"claim failed: ${err.message}").as(None))
           _ <- jobOpt match {
                  case Some(jobId) =>
@@ -87,7 +109,16 @@ object IngestionWorker {
                 for {
                   _ <- ZIO.logDebug(s"Job $jobId processed successfully, acknowledging")
                   _ <-
-                    jobQueue.ack(jobId).catchAll(e => ZIO.logWarning(s"ack failed for $jobId: ${e.message}"))
+                    jobQueue
+                      .ack(jobId)
+                      .timeoutFail(
+                        PipelineError.TimeoutError(
+                          operation = s"worker.success_ack_job.$jobId",
+                          timeoutMs = queueTimeout.toMillis
+                        )
+                      )(queueTimeout)
+                      .retry(queueRetrySchedule)
+                      .catchAll(e => ZIO.logWarning(s"ack failed for $jobId: ${e.message}"))
                 } yield ()
             ))
       }
@@ -95,12 +126,20 @@ object IngestionWorker {
     private def processById(jobId: UUID): ZIO[Any, PipelineError, Unit] =
       for {
         _      <- ZIO.logDebug(s"Starting processing for job $jobId")
-        jobOpt <- jobRepository.findById(jobId)
-        _      <- ZIO.logDebug(s"Job $jobId lookup: ${if (jobOpt.isDefined) "found" else "not found"}")
-        job    <- ZIO.fromOption(jobOpt).orElseFail(PipelineError.DatabaseError(s"Job $jobId not found", None))
-        _      <- ZIO.logDebug(s"Job $jobId status: ${job.status}, attempt: ${job.attempt}/${job.maxAttempts}")
-        _      <- processSingleJob(job)
-        _      <- ZIO.logDebug(s"Completed processing for job $jobId")
+        jobOpt <- jobRepository
+                    .findById(jobId)
+                    .timeoutFail(
+                      PipelineError.TimeoutError(
+                        operation = s"worker.find_job.$jobId",
+                        timeoutMs = databaseTimeout.toMillis
+                      )
+                    )(databaseTimeout)
+                    .retry(databaseRetrySchedule)
+        _   <- ZIO.logDebug(s"Job $jobId lookup: ${if (jobOpt.isDefined) "found" else "not found"}")
+        job <- ZIO.fromOption(jobOpt).orElseFail(PipelineError.DatabaseError(s"Job $jobId not found", None))
+        _   <- ZIO.logDebug(s"Job $jobId status: ${job.status}, attempt: ${job.attempt}/${job.maxAttempts}")
+        _   <- processSingleJob(job)
+        _   <- ZIO.logDebug(s"Completed processing for job $jobId")
       } yield ()
 
     private def processSingleJob(job: IngestionJob): ZIO[Any, PipelineError, Unit] =
@@ -108,17 +147,49 @@ object IngestionWorker {
         _ <-
           ZIO.logDebug(s"Processing job ${job.id} (source: ${job.source}) - incrementing attempt (${job.attempt + 1})")
         claimedJob <- ZIO.succeed(job.incrementAttempt().markTranscribing())
-        jobState1  <- jobRepository.update(claimedJob)
+        jobState1  <- jobRepository
+                       .update(claimedJob)
+                       .timeoutFail(
+                         PipelineError.TimeoutError(
+                           operation = s"worker.update_job_transcribing.${job.id}",
+                           timeoutMs = databaseTimeout.toMillis
+                         )
+                       )(databaseTimeout)
+                       .retry(databaseRetrySchedule)
         _          <- ZIO.logDebug(s"Job ${jobState1.id} - preparing ${jobState1.source} content")
         transcript <- preparatorRouter.dispatchAndPrepare(jobState1)
-        jobWithTid <- jobRepository.update(jobState1.copy(transcriptId = Some(transcript.id)))
-        _          <- ZIO.logDebug(s"Job ${jobWithTid.id} - marking as embedding")
-        jobState2  <- jobRepository.update(jobWithTid.markEmbedding())
+        jobWithTid <- jobRepository
+                        .update(jobState1.copy(transcriptId = Some(transcript.id)))
+                        .timeoutFail(
+                          PipelineError.TimeoutError(
+                            operation = s"worker.update_job_transcript.${job.id}",
+                            timeoutMs = databaseTimeout.toMillis
+                          )
+                        )(databaseTimeout)
+                        .retry(databaseRetrySchedule)
+        _         <- ZIO.logDebug(s"Job ${jobWithTid.id} - marking as embedding")
+        jobState2 <- jobRepository
+                       .update(jobWithTid.markEmbedding())
+                       .timeoutFail(
+                         PipelineError.TimeoutError(
+                           operation = s"worker.update_job_embedding.${job.id}",
+                           timeoutMs = databaseTimeout.toMillis
+                         )
+                       )(databaseTimeout)
+                       .retry(databaseRetrySchedule)
         _          <- indexingPipeline.index(transcript, jobState2)
         _          <- ZIO.logDebug(s"Job ${jobState2.id} - marking as success")
-        finalState <- jobRepository.update(jobState2.markSuccess())
-        _          <- cleanupBlob(finalState)
-        _          <- ZIO.logDebug(s"Job ${finalState.id} - processing completed successfully")
+        finalState <- jobRepository
+                        .update(jobState2.markSuccess())
+                        .timeoutFail(
+                          PipelineError.TimeoutError(
+                            operation = s"worker.update_job_success.${job.id}",
+                            timeoutMs = databaseTimeout.toMillis
+                          )
+                        )(databaseTimeout)
+                        .retry(databaseRetrySchedule)
+        _ <- cleanupBlob(finalState)
+        _ <- ZIO.logDebug(s"Job ${finalState.id} - processing completed successfully")
       } yield ()
 
     private def cleanupBlob(job: IngestionJob): ZIO[Any, Nothing, Unit] =
@@ -127,6 +198,13 @@ object IngestionWorker {
           ZIO.logDebug(s"Job ${job.id} - deleting blob $blobKey") *>
             blobStore
               .deleteBlob(blobKey)
+              .timeoutFail(
+                PipelineError.TimeoutError(
+                  operation = s"worker.cleanup_blob.${job.id}",
+                  timeoutMs = blobStoreTimeout.toMillis
+                )
+              )(blobStoreTimeout)
+              .retry(blobStoreRetrySchedule)
               .catchAll(error => ZIO.logWarning(s"Failed to delete blob for job ${job.id}: ${error.message}"))
         case None =>
           ZIO.logDebug(s"Job ${job.id} - no blob to cleanup")
@@ -139,6 +217,13 @@ object IngestionWorker {
         latestJob <-
           jobRepository
             .findById(job.id)
+            .timeoutFail(
+              PipelineError.TimeoutError(
+                operation = s"worker.failure_find_job.${job.id}",
+                timeoutMs = databaseTimeout.toMillis
+              )
+            )(databaseTimeout)
+            .retry(databaseRetrySchedule)
             .catchAll(err =>
               ZIO.logError(s"Failed to load job ${job.id} during failure handling: ${err.message}").as(Some(job))
             )
@@ -162,6 +247,13 @@ object IngestionWorker {
               updateOk <-
                 jobRepository
                   .update(updatedJob)
+                  .timeoutFail(
+                    PipelineError.TimeoutError(
+                      operation = s"worker.failure_update_job.${job.id}",
+                      timeoutMs = databaseTimeout.toMillis
+                    )
+                  )(databaseTimeout)
+                  .retry(databaseRetrySchedule)
                   .as(true)
                   .catchAll(err =>
                     ZIO.logError(s"Failed to update job ${updatedJob.id} after error: ${err.message}").as(false)
@@ -179,19 +271,47 @@ object IngestionWorker {
                            _ <- ZIO.logDebug(s"Job ${job.id} - scheduling retry in ${delayMs}ms (at $next)")
                            _ <- jobQueue
                                   .release(job.id)
+                                  .timeoutFail(
+                                    PipelineError.TimeoutError(
+                                      operation = s"worker.release_job.${job.id}",
+                                      timeoutMs = queueTimeout.toMillis
+                                    )
+                                  )(queueTimeout)
+                                  .retry(queueRetrySchedule)
                                   .catchAll(e => ZIO.logWarning(s"release failed for ${job.id}: ${e.message}"))
                            _ <- ZIO.sleep(zio.Duration.fromMillis(delayMs))
                            _ <- jobQueue
                                   .enqueue(job.id)
+                                  .timeoutFail(
+                                    PipelineError.TimeoutError(
+                                      operation = s"worker.retry_enqueue_job.${job.id}",
+                                      timeoutMs = queueTimeout.toMillis
+                                    )
+                                  )(queueTimeout)
+                                  .retry(queueRetrySchedule)
                                   .catchAll(e => ZIO.logWarning(s"retry enqueue failed for ${job.id}: ${e.message}"))
                          } yield ()).forkDaemon.unit
                        case None =>
                          ZIO.logDebug(s"Job ${job.id} - max attempts reached, sending to dead letter queue") *>
                            jobQueue
                              .ack(job.id)
+                             .timeoutFail(
+                               PipelineError.TimeoutError(
+                                 operation = s"worker.ack_job.${job.id}",
+                                 timeoutMs = queueTimeout.toMillis
+                               )
+                             )(queueTimeout)
+                             .retry(queueRetrySchedule)
                              .catchAll(e => ZIO.logWarning(s"ack failed for ${job.id}: ${e.message}")) *>
                            jobQueue
                              .deadLetter(job.id, error.message)
+                             .timeoutFail(
+                               PipelineError.TimeoutError(
+                                 operation = s"worker.deadletter_job.${job.id}",
+                                 timeoutMs = queueTimeout.toMillis
+                               )
+                             )(queueTimeout)
+                             .retry(queueRetrySchedule)
                              .catchAll(e => ZIO.logWarning(s"dead-letter failed for ${job.id}: ${e.message}"))
                    } else {
                      ZIO.logWarning(
@@ -206,8 +326,17 @@ object IngestionWorker {
       for {
         _      <- ZIO.logDebug(s"Handling failure for job $jobId (by ID): ${error.message}")
         now    <- Clock.instant
-        jobOpt <- jobRepository.findById(jobId).orElseSucceed(None)
-        _      <- ZIO.logDebug(s"Job $jobId lookup during failure handling: ${
+        jobOpt <- jobRepository
+                    .findById(jobId)
+                    .timeoutFail(
+                      PipelineError.TimeoutError(
+                        operation = s"worker.failure_find_job_by_id.$jobId",
+                        timeoutMs = databaseTimeout.toMillis
+                      )
+                    )(databaseTimeout)
+                    .retry(databaseRetrySchedule)
+                    .orElseSucceed(None)
+        _ <- ZIO.logDebug(s"Job $jobId lookup during failure handling: ${
                  if (jobOpt.isDefined) "found" else "not found, creating placeholder"
                }")
         baseJob = jobOpt.getOrElse(

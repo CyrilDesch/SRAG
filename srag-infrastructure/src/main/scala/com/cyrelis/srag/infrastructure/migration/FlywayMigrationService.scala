@@ -1,6 +1,7 @@
 package com.cyrelis.srag.infrastructure.migration
 
-import com.cyrelis.srag.infrastructure.config.DatabaseAdapterConfig
+import javax.sql.DataSource
+
 import org.flywaydb.core.Flyway
 import zio.*
 
@@ -8,22 +9,13 @@ trait MigrationService {
   def runMigrations(): Task[Unit]
 }
 
-final class FlywayMigrationService(config: DatabaseAdapterConfig) extends MigrationService {
+final class FlywayMigrationService(dataSource: DataSource) extends MigrationService {
 
-  override def runMigrations(): Task[Unit] = {
-    val (jdbcUrl, user, password) = config match {
-      case cfg: DatabaseAdapterConfig.Postgres =>
-        (
-          s"jdbc:postgresql://${cfg.host}:${cfg.port}/${cfg.database}",
-          cfg.user,
-          cfg.password
-        )
-    }
-
+  override def runMigrations(): Task[Unit] =
     ZIO.attempt {
       val flyway = Flyway
         .configure()
-        .dataSource(jdbcUrl, user, password)
+        .dataSource(dataSource)
         .locations("classpath:db/migration")
         .baselineOnMigrate(true)
         .load()
@@ -41,10 +33,4 @@ final class FlywayMigrationService(config: DatabaseAdapterConfig) extends Migrat
       ZIO.logError(s"Database migration failed: ${error.getMessage}") *>
         ZIO.fail(error)
     }
-  }
-}
-
-object FlywayMigrationService {
-  def layer: ZLayer[DatabaseAdapterConfig, Nothing, MigrationService] =
-    ZLayer.fromFunction((config: DatabaseAdapterConfig) => new FlywayMigrationService(config))
 }

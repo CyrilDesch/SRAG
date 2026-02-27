@@ -4,7 +4,6 @@ import com.cyrelis.srag.application.errors.PipelineError
 import com.cyrelis.srag.application.ports.{
   BlobStorePort,
   DatasourcePort,
-  DocumentParserPort,
   EmbedderPort,
   JobQueuePort,
   LexicalStorePort,
@@ -20,7 +19,6 @@ import com.cyrelis.srag.infrastructure.adapters.driven.database.postgres.{
   PostgresJobRepository,
   PostgresTranscriptRepository
 }
-import com.cyrelis.srag.infrastructure.adapters.driven.documentparser.PdfBoxParser
 import com.cyrelis.srag.infrastructure.adapters.driven.embedder.HuggingFaceAdapter
 import com.cyrelis.srag.infrastructure.adapters.driven.lexicalstore.OpenSearchAdapter
 import com.cyrelis.srag.infrastructure.adapters.driven.queue.RedisJobQueueAdapter
@@ -36,12 +34,12 @@ object AdapterFactory {
   def createDatasourceLayer(config: DatabaseAdapterConfig): ZLayer[Any, Throwable, DatasourcePort] =
     config match {
       case cfg: DatabaseAdapterConfig.Postgres =>
-        ZLayer.succeed(cfg) >>> PostgresDatasource.layer.map(ds => ZEnvironment(ds.get: DatasourcePort))
+        ZLayer.succeed(cfg) >>> PostgresDatasource.layer
     }
 
   def createTranscriptRepositoryLayer(
     config: DatabaseAdapterConfig
-  ): ZLayer[DatasourcePort, Nothing, TranscriptRepository[[X] =>> ZIO[Any, PipelineError, X]]] =
+  ): ZLayer[DatasourcePort, Throwable, TranscriptRepository[[X] =>> ZIO[Any, PipelineError, X]]] =
     config match {
       case _: DatabaseAdapterConfig.Postgres =>
         PostgresTranscriptRepository.layer
@@ -49,7 +47,7 @@ object AdapterFactory {
 
   def createJobRepositoryLayer(
     config: DatabaseAdapterConfig
-  ): ZLayer[DatasourcePort, Nothing, IngestionJobRepository[[X] =>> ZIO[Any, PipelineError, X]]] =
+  ): ZLayer[DatasourcePort, Throwable, IngestionJobRepository[[X] =>> ZIO[Any, PipelineError, X]]] =
     config match {
       case _: DatabaseAdapterConfig.Postgres =>
         PostgresJobRepository.layer
@@ -93,9 +91,6 @@ object AdapterFactory {
         ZLayer.succeed(cfg) >>> MinioAdapter.layer
     }
 
-  def createDocumentParserLayer(): ZLayer[Any, Throwable, DocumentParserPort] =
-    PdfBoxParser.layer
-
   def createJobQueueLayer(config: JobQueueAdapterConfig): ZLayer[Any, Throwable, JobQueuePort] =
     config match {
       case cfg: JobQueueAdapterConfig.Redis =>
@@ -106,7 +101,5 @@ object AdapterFactory {
     config match {
       case ApiAdapterConfig.REST(host, port, maxBodySizeBytes) =>
         new IngestRestGateway(host, port, maxBodySizeBytes)
-      case ApiAdapterConfig.GRPC(host, port) =>
-        throw new UnsupportedOperationException("gRPC gateway not yet implemented")
     }
 }

@@ -10,7 +10,6 @@ import com.cyrelis.srag.application.model.healthcheck.HealthStatus
 import com.cyrelis.srag.application.ports.TranscriberPort
 import com.cyrelis.srag.domain.transcript.{IngestSource, LanguageCode, Transcript, Word}
 import com.cyrelis.srag.infrastructure.config.TranscriberAdapterConfig
-import com.cyrelis.srag.infrastructure.resilience.ErrorMapper
 import io.circe.Codec
 import io.circe.parser.*
 import sttp.client4.*
@@ -23,8 +22,10 @@ final case class WhisperResponse(
   language: Option[String]
 ) derives Codec
 
-private[transcriber] class WhisperAdapter(config: TranscriberAdapterConfig.Whisper, httpClient: HttpClient)
-    extends TranscriberPort {
+private[transcriber] class WhisperAdapter(
+  config: TranscriberAdapterConfig.Whisper,
+  httpClient: HttpClient
+) extends TranscriberPort {
 
   override def transcribe(
     audioContent: Array[Byte],
@@ -34,7 +35,7 @@ private[transcriber] class WhisperAdapter(config: TranscriberAdapterConfig.Whisp
     val transcriptId = UUID.randomUUID()
     val now          = Instant.now()
 
-    ErrorMapper.mapTranscriptionError {
+    val effect =
       for {
         response <- makeWhisperRequest(audioContent, mediaContentType, mediaFilename)
         _        <-
@@ -78,7 +79,10 @@ private[transcriber] class WhisperAdapter(config: TranscriberAdapterConfig.Whisp
                         )
                       }
       } yield transcript
-    }
+
+    effect.mapError(error =>
+      com.cyrelis.srag.application.errors.PipelineError.TranscriptionError(error.getMessage, Some(error))
+    )
   }
 
   protected def makeWhisperRequest(

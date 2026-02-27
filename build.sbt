@@ -57,6 +57,7 @@ lazy val `srag-application` = project
   .dependsOn(`srag-domain`)
   .settings(
     applicationLibraryDependencies,
+    testingLibraryDependencies,
     publish / skip := true
   )
 

@@ -5,11 +5,11 @@ import java.util.UUID
 
 import com.cyrelis.srag.application.errors.PipelineError
 import com.cyrelis.srag.application.errors.PipelineError.ConfigurationError
+import com.cyrelis.srag.application.model.query.VectorStoreFilter
 import com.cyrelis.srag.application.ports.BlobStorePort
 import com.cyrelis.srag.application.usecases.healthcheck.HealthCheckService
 import com.cyrelis.srag.application.usecases.ingestion.IngestService
 import com.cyrelis.srag.application.usecases.query.QueryService
-import com.cyrelis.srag.application.model.query.VectorStoreFilter
 import com.cyrelis.srag.domain.transcript.TranscriptRepository
 import com.cyrelis.srag.infrastructure.adapters.driving.gateway.rest.dto.main.*
 import com.cyrelis.srag.infrastructure.adapters.driving.gateway.rest.error.ErrorHandler
@@ -42,12 +42,6 @@ object MainHandlers {
   def handleIngestText(req: TextIngestRestDto): ZIO[IngestService, String, JobAcceptedRestDto] =
     ZIO
       .serviceWithZIO[IngestService](_.submitText(req.content, Map.empty))
-      .map(JobAcceptedRestDto.fromDomain)
-      .mapError(ErrorHandler.errorToString)
-
-  def handleIngestDocument(req: DocumentIngestRestDto): ZIO[IngestService, String, JobAcceptedRestDto] =
-    ZIO
-      .serviceWithZIO[IngestService](_.submitDocument(req.content, req.mediaType, Map.empty))
       .map(JobAcceptedRestDto.fromDomain)
       .mapError(ErrorHandler.errorToString)
 

@@ -12,15 +12,16 @@ import com.cyrelis.srag.application.model.healthcheck.HealthStatus
 import com.cyrelis.srag.application.model.query.{LexicalSearchResult, VectorStoreFilter}
 import com.cyrelis.srag.application.ports.{DocumentInfo, LexicalStorePort}
 import com.cyrelis.srag.infrastructure.config.LexicalStoreAdapterConfig
-import com.cyrelis.srag.infrastructure.resilience.ErrorMapper
 import io.circe.{Decoder, parser, *}
 import sttp.client4.httpclient.zio.HttpClientZioBackend
 import sttp.client4.{Backend, *}
 import sttp.model.MediaType
 import zio.*
 
-private final class OpenSearchAdapter(config: LexicalStoreAdapterConfig.OpenSearch, httpClient: HttpClient)
-    extends LexicalStorePort {
+private final class OpenSearchAdapter(
+  config: LexicalStoreAdapterConfig.OpenSearch,
+  httpClient: HttpClient
+) extends LexicalStorePort {
 
   private val serviceName = s"OpenSearch(${config.index})"
 
@@ -95,89 +96,89 @@ private final class OpenSearchAdapter(config: LexicalStoreAdapterConfig.OpenSear
     transcriptId: UUID,
     segments: List[(Int, String)],
     metadata: Map[String, String]
-  ): ZIO[Any, PipelineError, Unit] =
-    ErrorMapper.mapLexicalStoreError {
-      if (segments.isEmpty) ZIO.unit
-      else
-        ZIO.scoped {
-          for {
-            backend     <- HttpClientZioBackend.scopedUsingClient(httpClient)
-            _           <- ensureIndexExists(backend)
-            metadataJson = metadataToJson(metadata)
-            bulkBody     = segments.map { case (index, text) =>
-                         val action = Json
-                           .obj(
-                             "index" -> Json.obj(
-                               "_index" -> Json.fromString(config.index),
-                               "_id"    -> Json.fromString(s"${transcriptId.toString}_$index")
-                             )
-                           )
-                           .noSpaces
-
-                         val doc = Json
-                           .obj(
-                             "transcript_id" -> Json.fromString(transcriptId.toString),
-                             "segment_index" -> Json.fromInt(index),
-                             "text"          -> Json.fromString(text),
-                             "metadata"      -> metadataJson
-                           )
-                           .noSpaces
-
-                         s"$action\n$doc"
-                       }
-                         .mkString("", "\n", "\n")
-            response <- basicRequest
-                          .post(uri"$baseUrl/_bulk")
-                          .headers(authHeaders)
-                          .contentType(MediaType("application", "x-ndjson"))
-                          .body(bulkBody)
-                          .response(asStringAlways)
-                          .send(backend)
-            _ <- ZIO
-                   .when(!response.code.isSuccess)(
-                     ZIO.fail(
-                       new RuntimeException(s"OpenSearch bulk index failed (${response.code.code}): ${response.body}")
-                     )
-                   )
-          } yield ()
-        }
-    }
-
-  override def deleteTranscript(transcriptId: UUID): ZIO[Any, PipelineError, Unit] =
-    ErrorMapper.mapLexicalStoreError {
+  ): ZIO[Any, PipelineError, Unit] = {
+    if (segments.isEmpty) ZIO.unit
+    else
       ZIO.scoped {
         for {
-          backend  <- HttpClientZioBackend.scopedUsingClient(httpClient)
-          _        <- ensureIndexExists(backend)
-          queryBody = Json
-                        .obj(
-                          "query" -> Json.obj(
-                            "term" -> Json.obj(
-                              "transcript_id" -> Json.obj(
-                                "value" -> Json.fromString(transcriptId.toString)
-                              )
-                            )
-                          )
-                        )
-                        .noSpaces
+          backend     <- HttpClientZioBackend.scopedUsingClient(httpClient)
+          _           <- ensureIndexExists(backend)
+          metadataJson = metadataToJson(metadata)
+          bulkBody     = segments.map { case (index, text) =>
+                       val action = Json
+                         .obj(
+                           "index" -> Json.obj(
+                             "_index" -> Json.fromString(config.index),
+                             "_id"    -> Json.fromString(s"${transcriptId.toString}_$index")
+                           )
+                         )
+                         .noSpaces
+
+                       val doc = Json
+                         .obj(
+                           "transcript_id" -> Json.fromString(transcriptId.toString),
+                           "segment_index" -> Json.fromInt(index),
+                           "text"          -> Json.fromString(text),
+                           "metadata"      -> metadataJson
+                         )
+                         .noSpaces
+
+                       s"$action\n$doc"
+                     }
+                       .mkString("", "\n", "\n")
           response <- basicRequest
-                        .post(uri"$indexUrl/_delete_by_query")
+                        .post(uri"$baseUrl/_bulk")
                         .headers(authHeaders)
-                        .contentType(MediaType.ApplicationJson)
-                        .body(queryBody)
+                        .contentType(MediaType("application", "x-ndjson"))
+                        .body(bulkBody)
                         .response(asStringAlways)
                         .send(backend)
           _ <- ZIO
                  .when(!response.code.isSuccess)(
                    ZIO.fail(
-                     new RuntimeException(
-                       s"OpenSearch delete_by_query failed (${response.code.code}): ${response.body}"
-                     )
+                     new RuntimeException(s"OpenSearch bulk index failed (${response.code.code}): ${response.body}")
                    )
                  )
         } yield ()
       }
+  }
+    .mapError(error => PipelineError.LexicalStoreError(error.getMessage, Some(error)))
+
+  override def deleteTranscript(transcriptId: UUID): ZIO[Any, PipelineError, Unit] = {
+    ZIO.scoped {
+      for {
+        backend  <- HttpClientZioBackend.scopedUsingClient(httpClient)
+        _        <- ensureIndexExists(backend)
+        queryBody = Json
+                      .obj(
+                        "query" -> Json.obj(
+                          "term" -> Json.obj(
+                            "transcript_id" -> Json.obj(
+                              "value" -> Json.fromString(transcriptId.toString)
+                            )
+                          )
+                        )
+                      )
+                      .noSpaces
+        response <- basicRequest
+                      .post(uri"$indexUrl/_delete_by_query")
+                      .headers(authHeaders)
+                      .contentType(MediaType.ApplicationJson)
+                      .body(queryBody)
+                      .response(asStringAlways)
+                      .send(backend)
+        _ <- ZIO
+               .when(!response.code.isSuccess)(
+                 ZIO.fail(
+                   new RuntimeException(
+                     s"OpenSearch delete_by_query failed (${response.code.code}): ${response.body}"
+                   )
+                 )
+               )
+      } yield ()
     }
+  }
+    .mapError(error => PipelineError.LexicalStoreError(error.getMessage, Some(error)))
 
   private final case class OpenSearchHitSource(
     transcript_id: String,
@@ -196,108 +197,108 @@ private final class OpenSearchAdapter(config: LexicalStoreAdapterConfig.OpenSear
     queryText: String,
     limit: Int,
     filter: Option[VectorStoreFilter]
-  ): ZIO[Any, PipelineError, List[LexicalSearchResult]] =
-    ErrorMapper.mapLexicalStoreError {
-      ZIO.scoped {
-        for {
-          backend <- HttpClientZioBackend.scopedUsingClient(httpClient)
-          _       <- ensureIndexExists(backend)
-          baseMust = List(
-                       Json.obj(
-                         "match" -> Json.obj(
-                           "text" -> Json.obj(
-                             "query"            -> Json.fromString(queryText),
-                             "operator"         -> Json.fromString("or"),
-                             "zero_terms_query" -> Json.fromString("all")
-                           )
+  ): ZIO[Any, PipelineError, List[LexicalSearchResult]] = {
+    ZIO.scoped {
+      for {
+        backend <- HttpClientZioBackend.scopedUsingClient(httpClient)
+        _       <- ensureIndexExists(backend)
+        baseMust = List(
+                     Json.obj(
+                       "match" -> Json.obj(
+                         "text" -> Json.obj(
+                           "query"            -> Json.fromString(queryText),
+                           "operator"         -> Json.fromString("or"),
+                           "zero_terms_query" -> Json.fromString("all")
                          )
                        )
                      )
-          filterTerms = filter
-                          .map(_.metadata.map { case (k, v) =>
-                            Json.obj(
-                              "term" -> Json.obj(
-                                s"metadata.$k" -> Json.fromString(v)
-                              )
-                            )
-                          }.toList)
-                          .getOrElse(Nil)
-          queryBody = Json
-                        .obj(
-                          "size"  -> Json.fromInt(limit),
-                          "query" -> Json.obj(
-                            "bool" -> Json.obj(
-                              "must"   -> Json.fromValues(baseMust),
-                              "filter" -> Json.fromValues(filterTerms)
+                   )
+        filterTerms = filter
+                        .map(_.metadata.map { case (k, v) =>
+                          Json.obj(
+                            "term" -> Json.obj(
+                              s"metadata.$k" -> Json.fromString(v)
                             )
                           )
+                        }.toList)
+                        .getOrElse(Nil)
+        queryBody = Json
+                      .obj(
+                        "size"  -> Json.fromInt(limit),
+                        "query" -> Json.obj(
+                          "bool" -> Json.obj(
+                            "must"   -> Json.fromValues(baseMust),
+                            "filter" -> Json.fromValues(filterTerms)
+                          )
                         )
-                        .noSpaces
-          response <- basicRequest
-                        .post(uri"$indexUrl/_search")
-                        .headers(authHeaders)
-                        .contentType(MediaType.ApplicationJson)
-                        .body(queryBody)
-                        .response(asStringAlways)
-                        .send(backend)
-          _ <- ZIO
-                 .when(!response.code.isSuccess)(
-                   ZIO.fail(new RuntimeException(s"OpenSearch search failed (${response.code.code}): ${response.body}"))
-                 )
-          parsed <- ZIO
-                      .fromEither(parser.decode[OpenSearchSearchResponse](response.body))
-                      .mapError(err => new RuntimeException(s"Failed to decode OpenSearch response: ${err.getMessage}"))
-          results = parsed.hits.hits.map { hit =>
-                      LexicalSearchResult(
-                        transcriptId = UUID.fromString(hit._source.transcript_id),
-                        segmentIndex = hit._source.segment_index,
-                        score = hit._score,
-                        text = hit._source.text,
-                        metadata = hit._source.metadata.getOrElse(Map.empty)
+                      )
+                      .noSpaces
+        response <- basicRequest
+                      .post(uri"$indexUrl/_search")
+                      .headers(authHeaders)
+                      .contentType(MediaType.ApplicationJson)
+                      .body(queryBody)
+                      .response(asStringAlways)
+                      .send(backend)
+        _ <- ZIO
+               .when(!response.code.isSuccess)(
+                 ZIO.fail(new RuntimeException(s"OpenSearch search failed (${response.code.code}): ${response.body}"))
+               )
+        parsed <- ZIO
+                    .fromEither(parser.decode[OpenSearchSearchResponse](response.body))
+                    .mapError(err => new RuntimeException(s"Failed to decode OpenSearch response: ${err.getMessage}"))
+        results = parsed.hits.hits.map { hit =>
+                    LexicalSearchResult(
+                      transcriptId = UUID.fromString(hit._source.transcript_id),
+                      segmentIndex = hit._source.segment_index,
+                      score = hit._score,
+                      text = hit._source.text,
+                      metadata = hit._source.metadata.getOrElse(Map.empty)
+                    )
+                  }
+      } yield results
+    }
+  }
+    .mapError(error => PipelineError.LexicalStoreError(error.getMessage, Some(error)))
+
+  override def listAllDocuments(): ZIO[Any, PipelineError, List[DocumentInfo]] = {
+    ZIO.scoped {
+      for {
+        backend  <- HttpClientZioBackend.scopedUsingClient(httpClient)
+        _        <- ensureIndexExists(backend)
+        queryBody = Json
+                      .obj(
+                        "size"  -> Json.fromInt(10000),
+                        "query" -> Json.obj("match_all" -> Json.obj())
+                      )
+                      .noSpaces
+        response <- basicRequest
+                      .post(uri"$indexUrl/_search")
+                      .headers(authHeaders)
+                      .contentType(MediaType.ApplicationJson)
+                      .body(queryBody)
+                      .response(asStringAlways)
+                      .send(backend)
+        _ <- ZIO
+               .when(!response.code.isSuccess)(
+                 ZIO.fail(new RuntimeException(s"OpenSearch search failed (${response.code.code}): ${response.body}"))
+               )
+        parsed <- ZIO
+                    .fromEither(parser.decode[OpenSearchSearchResponse](response.body))
+                    .mapError(err => new RuntimeException(s"Failed to decode OpenSearch response: ${err.getMessage}"))
+        documents = parsed.hits.hits.map { hit =>
+                      DocumentInfo(
+                        id = hit._id,
+                        transcriptId = Some(UUID.fromString(hit._source.transcript_id)),
+                        segmentIndex = Some(hit._source.segment_index),
+                        text = Some(hit._source.text),
+                        metadata = hit._source.metadata
                       )
                     }
-        } yield results
-      }
+      } yield documents
     }
-
-  override def listAllDocuments(): ZIO[Any, PipelineError, List[DocumentInfo]] =
-    ErrorMapper.mapLexicalStoreError {
-      ZIO.scoped {
-        for {
-          backend  <- HttpClientZioBackend.scopedUsingClient(httpClient)
-          _        <- ensureIndexExists(backend)
-          queryBody = Json
-                        .obj(
-                          "size"  -> Json.fromInt(10000),
-                          "query" -> Json.obj("match_all" -> Json.obj())
-                        )
-                        .noSpaces
-          response <- basicRequest
-                        .post(uri"$indexUrl/_search")
-                        .headers(authHeaders)
-                        .contentType(MediaType.ApplicationJson)
-                        .body(queryBody)
-                        .response(asStringAlways)
-                        .send(backend)
-          _ <- ZIO
-                 .when(!response.code.isSuccess)(
-                   ZIO.fail(new RuntimeException(s"OpenSearch search failed (${response.code.code}): ${response.body}"))
-                 )
-          parsed <- ZIO
-                      .fromEither(parser.decode[OpenSearchSearchResponse](response.body))
-                      .mapError(err => new RuntimeException(s"Failed to decode OpenSearch response: ${err.getMessage}"))
-          documents = parsed.hits.hits.map { hit =>
-                        DocumentInfo(
-                          id = hit._id,
-                          transcriptId = Some(UUID.fromString(hit._source.transcript_id)),
-                          segmentIndex = Some(hit._source.segment_index),
-                          text = Some(hit._source.text),
-                          metadata = hit._source.metadata
-                        )
-                      }
-        } yield documents
-      }
-    }
+  }
+    .mapError(error => PipelineError.LexicalStoreError(error.getMessage, Some(error)))
 
   override def healthCheck(): Task[HealthStatus] = {
     val now = Instant.now()

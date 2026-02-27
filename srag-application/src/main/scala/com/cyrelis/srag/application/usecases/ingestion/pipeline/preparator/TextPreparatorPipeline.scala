@@ -23,13 +23,26 @@ object TextPreparatorPipeline {
     blobStore: BlobStorePort
   ) extends TextPreparatorPipeline {
 
+    private val textFetchTimeout       = 15.seconds
+    private val textFetchRetrySchedule =
+      Schedule.exponential(100.millis, 2.0).modifyDelay((_, d) => if (d > 5.seconds) 5.seconds else d) &&
+        Schedule.recurs(2)
+
     override def prepare(job: IngestionJob): ZIO[Any, PipelineError, Transcript] =
       for {
         blobKey <- ZIO
                      .fromOption(job.blobKey)
                      .orElseFail(PipelineError.DatabaseError(s"Missing blob key for text job ${job.id}", None))
-        _          <- ZIO.logDebug(s"Job ${job.id} - fetching text blob $blobKey")
-        textBytes  <- blobStore.fetchAudio(blobKey)
+        _         <- ZIO.logDebug(s"Job ${job.id} - fetching text blob $blobKey")
+        textBytes <- blobStore
+                       .fetchAudio(blobKey)
+                       .timeoutFail(
+                         PipelineError.TimeoutError(
+                           operation = s"text_preparation.fetch_blob.${job.id}",
+                           timeoutMs = textFetchTimeout.toMillis
+                         )
+                       )(textFetchTimeout)
+                       .retry(textFetchRetrySchedule)
         textContent = new String(textBytes, StandardCharsets.UTF_8)
         _          <- ZIO.logDebug(s"Job ${job.id} - text content loaded: ${textContent.length} chars")
         words       = textContent

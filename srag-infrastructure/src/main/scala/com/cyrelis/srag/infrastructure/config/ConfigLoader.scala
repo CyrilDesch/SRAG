@@ -115,7 +115,6 @@ object ConfigLoader {
         val typ = raw.getString("srag.adapters.driving.api.type")
         typ match {
           case "rest" => loadCommon(deriveConfig[ApiAdapterConfig.REST], "srag", "adapters", "driving", "api", typ)
-          case "grpc" => loadCommon(deriveConfig[ApiAdapterConfig.GRPC], "srag", "adapters", "driving", "api", typ)
           case other  => ZIO.fail(new Exception(s"Unknown api adapter type: $other"))
         }
       }
@@ -124,8 +123,6 @@ object ConfigLoader {
         api          <- loadCommon(deriveConfig[ApiConfig], "srag", "api")
         migrations   <- loadCommon(deriveConfig[MigrationConfig], "srag", "migrations")
         fixtures     <- loadCommon(deriveConfig[FixtureConfig], "srag", "fixtures")
-        retry        <- loadCommon(deriveConfig[RetryConfig], "srag", "retry")
-        timeouts     <- loadCommon(deriveConfig[TimeoutConfig], "srag", "timeouts")
         jobs         <- loadCommon(deriveConfig[JobsConfig], "srag", "jobs")
         db           <- loadDb
         vectorStore  <- loadVectorStore
@@ -154,8 +151,6 @@ object ConfigLoader {
         ),
         migrations = migrations,
         fixtures = fixtures,
-        retry = retry,
-        timeouts = timeouts,
         jobs = jobs
       )
     }

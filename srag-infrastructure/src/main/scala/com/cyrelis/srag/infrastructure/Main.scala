@@ -1,9 +1,9 @@
 package com.cyrelis.srag.infrastructure
 
-import com.cyrelis.srag.application.ports.JobQueuePort
-import com.cyrelis.srag.application.ports.JobQueuePort.LockExpirationSeconds
-import com.cyrelis.srag.application.usecases.healthcheck.HealthCheckService
 import com.cyrelis.srag.application.model.healthcheck.HealthStatus
+import com.cyrelis.srag.application.ports.JobQueuePort.LockExpirationSeconds
+import com.cyrelis.srag.application.ports.{DatasourcePort, JobQueuePort}
+import com.cyrelis.srag.application.usecases.healthcheck.HealthCheckService
 import com.cyrelis.srag.application.usecases.ingestion.IngestionWorker
 import com.cyrelis.srag.infrastructure.adapters.driving.Gateway
 import com.cyrelis.srag.infrastructure.config.{ConfigLoader, RuntimeConfig}
@@ -71,7 +71,7 @@ object Main extends ZIOAppDefault {
       _ <- ZIO.logInfo("Job recovery completed")
     } yield ()
 
-  private def runMigrations: ZIO[RuntimeConfig, Throwable, Unit] =
+  private def runMigrations: ZIO[RuntimeConfig & DatasourcePort, Throwable, Unit] =
     for {
       config <- ZIO.service[RuntimeConfig]
       _      <- if (config.migrations.runOnStartup) {

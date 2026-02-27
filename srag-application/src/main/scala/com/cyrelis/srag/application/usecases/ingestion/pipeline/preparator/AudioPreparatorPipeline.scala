@@ -22,6 +22,17 @@ object AudioPreparatorPipeline {
     transcriber: TranscriberPort
   ) extends AudioPreparatorPipeline {
 
+    private val blobFetchTimeout  = 15.seconds
+    private val transcribeTimeout = 300.seconds
+
+    private val blobFetchRetrySchedule =
+      Schedule.exponential(100.millis, 2.0).modifyDelay((_, d) => if (d > 5.seconds) 5.seconds else d) &&
+        Schedule.recurs(2)
+
+    private val transcribeRetrySchedule =
+      Schedule.exponential(200.millis, 2.0).modifyDelay((_, d) => if (d > 5.seconds) 5.seconds else d) &&
+        Schedule.recurs(1)
+
     override def prepare(job: IngestionJob): ZIO[Any, PipelineError, Transcript] =
       for {
         blobKey <- ZIO
@@ -36,11 +47,27 @@ object AudioPreparatorPipeline {
           ZIO
             .fromOption(job.mediaFilename)
             .orElseFail(PipelineError.DatabaseError(s"Missing media filename for job ${job.id}", None))
-        _               <- ZIO.logDebug(s"Job ${job.id} - media: $mediaFilename (content-type: $contentType)")
-        audio           <- blobStore.fetchAudio(blobKey)
+        _     <- ZIO.logDebug(s"Job ${job.id} - media: $mediaFilename (content-type: $contentType)")
+        audio <- blobStore
+                   .fetchAudio(blobKey)
+                   .timeoutFail(
+                     PipelineError.TimeoutError(
+                       operation = s"audio_preparation.fetch_blob.${job.id}",
+                       timeoutMs = blobFetchTimeout.toMillis
+                     )
+                   )(blobFetchTimeout)
+                   .retry(blobFetchRetrySchedule)
         _               <- ZIO.logDebug(s"Job ${job.id} - transcribing audio (size: ${audio.length} bytes)")
-        temp_transcript <- transcriber.transcribe(audio, contentType, mediaFilename)
-        _               <-
+        temp_transcript <- transcriber
+                             .transcribe(audio, contentType, mediaFilename)
+                             .timeoutFail(
+                               PipelineError.TimeoutError(
+                                 operation = s"audio_preparation.transcribe.${job.id}",
+                                 timeoutMs = transcribeTimeout.toMillis
+                               )
+                             )(transcribeTimeout)
+                             .retry(transcribeRetrySchedule)
+        _ <-
           ZIO.logDebug(
             s"Job ${job.id} - transcription completed: transcript ${temp_transcript.id}, text length: ${temp_transcript.text.length} chars"
           )

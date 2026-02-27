@@ -5,7 +5,6 @@ import com.cyrelis.srag.application.ports.DatasourcePort
 import com.cyrelis.srag.domain.ingestionjob.IngestionJobRepository
 import com.cyrelis.srag.domain.transcript.TranscriptRepository
 import com.cyrelis.srag.infrastructure.config.{AdapterFactory, RuntimeConfig}
-import com.cyrelis.srag.infrastructure.resilience.RetryWrappers
 import zio.*
 
 trait DatabaseWiring {
@@ -32,8 +31,7 @@ trait DatabaseWiring {
                       .provideSome[DatasourcePort](
                         AdapterFactory.createTranscriptRepositoryLayer(config.adapters.driven.database)
                       )
-        repo = RetryWrappers.wrapTranscriptRepository(baseRepo, config.retry, config.timeouts)
-      } yield repo
+      } yield baseRepo
     }
 
   val jobRepositoryLayer
@@ -47,8 +45,7 @@ trait DatabaseWiring {
                      .provideSome[DatasourcePort](
                        AdapterFactory.createJobRepositoryLayer(config.adapters.driven.database)
                      )
-        wrappedRepo = RetryWrappers.wrapJobRepository(jobRepo, config.retry, config.timeouts)
-      } yield wrappedRepo
+      } yield jobRepo
     }
 }
 

@@ -1,5 +1,7 @@
 package com.cyrelis.srag.infrastructure.migration
 
+import com.cyrelis.srag.application.ports.DatasourcePort
+import com.cyrelis.srag.infrastructure.adapters.driven.database.postgres.QuillDatasource
 import com.cyrelis.srag.infrastructure.config.{BlobStoreAdapterConfig, RuntimeConfig, VectorStoreAdapterConfig}
 import zio.*
 
@@ -9,7 +11,7 @@ import zio.*
  */
 object MigrationRunner {
 
-  def runAll(): ZIO[RuntimeConfig, Throwable, Unit] =
+  def runAll(): ZIO[RuntimeConfig & DatasourcePort, Throwable, Unit] =
     for {
       config <- ZIO.service[RuntimeConfig]
       _      <- ZIO.logInfo("Starting migration and initialization...")
@@ -20,11 +22,16 @@ object MigrationRunner {
       _      <- ZIO.logInfo("All migrations and initializations completed successfully")
     } yield ()
 
-  private def runDatabaseMigrations(): ZIO[RuntimeConfig, Throwable, Unit] =
+  private def runDatabaseMigrations(): ZIO[DatasourcePort, Throwable, Unit] =
     for {
-      config          <- ZIO.service[RuntimeConfig]
-      dbConfig         = config.adapters.driven.database
-      migrationService = new FlywayMigrationService(dbConfig)
+      datasource      <- ZIO.service[DatasourcePort]
+      quillDatasource <- ZIO.fromEither(
+                           datasource match {
+                             case qd: QuillDatasource => Right(qd)
+                             case _                   => Left(new IllegalStateException("DatasourcePort is not a QuillDatasource"))
+                           }
+                         )
+      migrationService = new FlywayMigrationService(quillDatasource.dataSource)
       _               <- migrationService.runMigrations()
     } yield ()
 

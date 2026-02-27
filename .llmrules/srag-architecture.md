@@ -1,60 +1,57 @@
 ---
-description: SRAG hexagonal architecture and module structure
+description: On-demand SRAG architecture rules covering module boundaries, ports/adapters, and wiring workflow
 ---
 
-# SRAG Hexagonal Architecture
+# SRAG Architecture Rules
 
-## Module Structure and Dependencies
+## High-Level Architecture
 
-This project follows strict hexagonal architecture with three sbt modules:
+- SRAG follows hexagonal architecture (ports and adapters).
+- Dependency direction is strict:
 
+```text
+srag-domain <- srag-application <- srag-infrastructure
 ```
-domain  ←  application  ←  infrastructure
-```
 
-**Dependency Rule**: Each module only depends on layers to its left. Never reverse dependencies.
+- Never introduce reverse dependencies.
 
-### modules/domain
+## Module Responsibilities
 
-- **Purpose**: Pure business model only
-- **Contains**: Immutable domain types (`Transcript`, `Segment`, `IngestionJob`, metadata, domain events, errors)
-- **Dependencies**: Scala stdlib only (+ lightweight helpers like `zio-prelude`)
-- **Forbidden**: NO ZIO effects, NO gRPC, NO database types, NO external SDKs
+### `srag-domain`
 
-### modules/application
+- Pure domain model and domain rules.
+- Immutable business types and ADTs.
+- No infrastructure concerns, no framework-specific I/O code.
 
-- **Purpose**: Use cases and port definitions
-- **Contains**:
-  - Use cases orchestrating business workflows (`DefaultIngestPipeline`, `ReplayJob`)
-  - **Driving ports** (`ports/driving/`): interfaces exposed to external world
-  - **Driven ports** (`ports/driven/`): interfaces for outbound dependencies
-- **Dependencies**: `domain` module + ZIO core for effects
-- **Forbidden**: NO concrete adapters, NO infrastructure concerns
+### `srag-application`
 
-### modules/infrastructure
+- Use-case orchestration and port interfaces.
+- Business workflows composed from ports.
+- No concrete adapter code.
 
-- **Purpose**: All adapters and runtime concerns
-- **Contains**:
-  - **Primary adapters** (`adapters/driving/`): gRPC, HTTP/REST, CLI entry points
-  - **Secondary adapters** (`adapters/driven/`): Database, vector stores, transcription APIs, embedding services, blob storage
-  - **Runtime** (`runtime/`): ZIO layer wiring, configuration loading, observability
-- **Dependencies**: `application` module + all third-party SDKs
-- **Rule**: Each adapter in its own package (easy to swap implementations)
+### `srag-infrastructure`
 
-## Adding New Features
+- Concrete driving and driven adapters.
+- Runtime wiring with layers, configuration loading, and external integrations.
+- Protocol mapping (HTTP/transport), observability, lifecycle startup/shutdown.
 
-Follow this workflow:
+## Port and Adapter Rules
 
-1. **Domain first**: Add entities/events/errors in `modules/domain`
-2. **Define ports**: Create/update port interfaces in `modules/application/ports`
-3. **Implement use case**: Add orchestration logic in `modules/application/usecase`
-4. **Create adapters**: Implement concrete adapters in `modules/infrastructure/adapters`
-5. **Wire runtime**: Update `modules/infrastructure/runtime` with ZIO layers
-6. **Update config**: Extend configuration in `RuntimeConfig.scala` and `application.conf`
+- Define ports in the application module.
+- Implement adapters in infrastructure only.
+- Keep adapters thin: translate protocol/data/SDK concerns into domain-friendly inputs/outputs.
+- Map external failures into domain/application error types at adapter boundaries.
+- Keep transport mapping (status codes, payload shapes) in driving adapters.
 
-## Key Principles
+## Configuration and Wiring
 
-- **Dependency Inversion**: Always code against ports (traits), implement in adapters
-- **Domain Purity**: Keep domain model free from serialization/IO concerns
-- **Error Modeling**: Errors are domain concepts; propagate through use cases; map to protocols in adapters
-- **Testing**: Unit tests for domain/application; integration tests for adapters
+- Use typed runtime configuration models.
+- Keep adapter selection declarative (config-driven).
+- Centralize wiring in runtime/config composition.
+- Ensure each long-lived integration is managed as a scoped resource.
+
+## Testing by Layer
+
+- Domain: pure unit tests for invariants and behavior.
+- Application: effect tests for workflow orchestration and error handling.
+- Infrastructure: no tests.

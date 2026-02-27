@@ -10,7 +10,6 @@ import com.cyrelis.srag.application.errors.PipelineError
 import com.cyrelis.srag.application.model.healthcheck.HealthStatus
 import com.cyrelis.srag.application.ports.{BlobInfo, BlobStorePort}
 import com.cyrelis.srag.infrastructure.config.BlobStoreAdapterConfig
-import com.cyrelis.srag.infrastructure.resilience.ErrorMapper
 import io.minio.*
 import zio.*
 import zio.stream.ZStream
@@ -22,48 +21,48 @@ private final class MinioAdapter(minioClient: MinioClient, endpoint: String, buc
     audioContent: Array[Byte],
     mediaContentType: String,
     mediaFilename: String
-  ): ZIO[Any, PipelineError, String] =
-    ErrorMapper.mapBlobStoreError {
-      for {
-        blobKey <- ZIO.succeed(UUID.randomUUID().toString)
-        metadata = Map(
-                     "x-amz-meta-original-filename" -> mediaFilename,
-                     "x-amz-meta-content-type"      -> mediaContentType
-                   ).asJava
-        _ <- uploadBlobWithMetadata(blobKey, audioContent, mediaContentType, metadata)
-      } yield blobKey
-    }
+  ): ZIO[Any, PipelineError, String] = {
+    for {
+      blobKey <- ZIO.succeed(UUID.randomUUID().toString)
+      metadata = Map(
+                   "x-amz-meta-original-filename" -> mediaFilename,
+                   "x-amz-meta-content-type"      -> mediaContentType
+                 ).asJava
+      _ <- uploadBlobWithMetadata(blobKey, audioContent, mediaContentType, metadata)
+    } yield blobKey
+  }
+    .mapError(error => PipelineError.BlobStoreError(error.getMessage, Some(error)))
 
-  override def storeText(jobId: UUID, textContent: String): ZIO[Any, PipelineError, String] =
-    ErrorMapper.mapBlobStoreError {
-      for {
-        blobKey <- ZIO.succeed(UUID.randomUUID().toString)
-        filename = s"text-${java.lang.System.currentTimeMillis()}.txt"
-        metadata = Map(
-                     "x-amz-meta-original-filename" -> filename,
-                     "x-amz-meta-content-type"      -> "text/plain"
-                   ).asJava
-        contentBytes <- ZIO.succeed(textContent.getBytes("UTF-8"))
-        _            <- uploadBlobWithMetadata(blobKey, contentBytes, "text/plain", metadata)
-      } yield blobKey
-    }
+  override def storeText(jobId: UUID, textContent: String): ZIO[Any, PipelineError, String] = {
+    for {
+      blobKey <- ZIO.succeed(UUID.randomUUID().toString)
+      filename = s"text-${java.lang.System.currentTimeMillis()}.txt"
+      metadata = Map(
+                   "x-amz-meta-original-filename" -> filename,
+                   "x-amz-meta-content-type"      -> "text/plain"
+                 ).asJava
+      contentBytes <- ZIO.succeed(textContent.getBytes("UTF-8"))
+      _            <- uploadBlobWithMetadata(blobKey, contentBytes, "text/plain", metadata)
+    } yield blobKey
+  }
+    .mapError(error => PipelineError.BlobStoreError(error.getMessage, Some(error)))
 
-  override def fetchAudio(blobKey: String): ZIO[Any, PipelineError, Array[Byte]] =
-    ErrorMapper.mapBlobStoreError {
-      for {
-        inputStream <-
-          ZIO.attemptBlocking(minioClient.getObject(GetObjectArgs.builder().bucket(bucket).`object`(blobKey).build()))
-        bytes <-
-          ZIO.attemptBlocking(inputStream.readAllBytes()).ensuring(ZIO.attemptBlocking(inputStream.close()).ignore)
-      } yield bytes
-    }
+  override def fetchAudio(blobKey: String): ZIO[Any, PipelineError, Array[Byte]] = {
+    for {
+      inputStream <-
+        ZIO.attemptBlocking(minioClient.getObject(GetObjectArgs.builder().bucket(bucket).`object`(blobKey).build()))
+      bytes <-
+        ZIO.attemptBlocking(inputStream.readAllBytes()).ensuring(ZIO.attemptBlocking(inputStream.close()).ignore)
+    } yield bytes
+  }
+    .mapError(error => PipelineError.BlobStoreError(error.getMessage, Some(error)))
 
   override def fetchBlobAsStream(blobKey: String): ZStream[Any, PipelineError, Byte] =
     ZStream
       .fromZIO(
-        ErrorMapper.mapBlobStoreError(
-          ZIO.attemptBlocking(minioClient.getObject(GetObjectArgs.builder().bucket(bucket).`object`(blobKey).build()))
-        )
+        ZIO
+          .attemptBlocking(minioClient.getObject(GetObjectArgs.builder().bucket(bucket).`object`(blobKey).build()))
+          .mapError(error => PipelineError.BlobStoreError(error.getMessage, Some(error)))
       )
       .flatMap(inputStream =>
         ZStream
@@ -72,106 +71,92 @@ private final class MinioAdapter(minioClient: MinioClient, endpoint: String, buc
           .ensuring(ZIO.attempt(inputStream.close()).ignore)
       )
 
-  override def getBlobFilename(blobKey: String): ZIO[Any, PipelineError, Option[String]] =
-    ErrorMapper.mapBlobStoreError {
-      ZIO.attemptBlocking {
-        val statObjectResponse = minioClient.statObject(
-          StatObjectArgs.builder().bucket(bucket).`object`(blobKey).build()
-        )
-        val metadata = statObjectResponse.userMetadata()
-        val exactKey = "x-amz-meta-original-filename"
-        Option(metadata.get(exactKey)).orElse {
-          metadata.asScala.collectFirst {
-            case (k, v) if k.toLowerCase.contains("original-filename") => v
-          }
+  override def getBlobFilename(blobKey: String): ZIO[Any, PipelineError, Option[String]] = {
+    ZIO.attemptBlocking {
+      val statObjectResponse = minioClient.statObject(
+        StatObjectArgs.builder().bucket(bucket).`object`(blobKey).build()
+      )
+      val metadata = statObjectResponse.userMetadata()
+      val exactKey = "x-amz-meta-original-filename"
+      Option(metadata.get(exactKey)).orElse {
+        metadata.asScala.collectFirst {
+          case (k, v) if k.toLowerCase.contains("original-filename") => v
         }
       }
     }
+  }
+    .mapError(error => PipelineError.BlobStoreError(error.getMessage, Some(error)))
 
-  override def getBlobContentType(blobKey: String): ZIO[Any, PipelineError, Option[String]] =
-    ErrorMapper.mapBlobStoreError {
-      ZIO.attemptBlocking {
-        val statObjectResponse = minioClient.statObject(
-          StatObjectArgs.builder().bucket(bucket).`object`(blobKey).build()
-        )
-        val metadata = statObjectResponse.userMetadata()
-        val exactKey = "x-amz-meta-content-type"
-        Option(metadata.get(exactKey)).orElse {
-          metadata.asScala.collectFirst {
-            case (k, v) if k.toLowerCase.contains("content-type") => v
-          }
-        }.orElse {
-          Option(statObjectResponse.contentType())
+  override def getBlobContentType(blobKey: String): ZIO[Any, PipelineError, Option[String]] = {
+    ZIO.attemptBlocking {
+      val statObjectResponse = minioClient.statObject(
+        StatObjectArgs.builder().bucket(bucket).`object`(blobKey).build()
+      )
+      val metadata = statObjectResponse.userMetadata()
+      val exactKey = "x-amz-meta-content-type"
+      Option(metadata.get(exactKey)).orElse {
+        metadata.asScala.collectFirst {
+          case (k, v) if k.toLowerCase.contains("content-type") => v
         }
+      }.orElse {
+        Option(statObjectResponse.contentType())
       }
     }
+  }
+    .mapError(error => PipelineError.BlobStoreError(error.getMessage, Some(error)))
 
-  override def deleteBlob(blobKey: String): ZIO[Any, PipelineError, Unit] =
-    ErrorMapper.mapBlobStoreError {
-      ZIO
-        .attemptBlocking(minioClient.removeObject(RemoveObjectArgs.builder().bucket(bucket).`object`(blobKey).build()))
-        .unit
-    }
+  override def deleteBlob(blobKey: String): ZIO[Any, PipelineError, Unit] = {
+    ZIO
+      .attemptBlocking(minioClient.removeObject(RemoveObjectArgs.builder().bucket(bucket).`object`(blobKey).build()))
+      .unit
+  }
+    .mapError(error => PipelineError.BlobStoreError(error.getMessage, Some(error)))
 
-  override def listAllBlobs(): ZIO[Any, PipelineError, List[BlobInfo]] =
-    ErrorMapper.mapBlobStoreError {
-      ZIO.attemptBlocking {
-        val objects = minioClient.listObjects(
-          ListObjectsArgs.builder().bucket(bucket).recursive(true).build()
-        )
-        objects.asScala.toList.flatMap { resultItem =>
-          try {
-            val item       = resultItem.get()
-            val objectName = item.objectName()
-            val stat       = minioClient.statObject(
-              StatObjectArgs.builder().bucket(bucket).`object`(objectName).build()
-            )
-            val metadata = stat.userMetadata()
-            val filename = {
-              val exactKey = "x-amz-meta-original-filename"
-              Option(metadata.get(exactKey)).orElse {
-                metadata.asScala.collectFirst {
-                  case (k, v) if k.toLowerCase.contains("original-filename") => v
-                }
+  override def listAllBlobs(): ZIO[Any, PipelineError, List[BlobInfo]] = {
+    ZIO.attemptBlocking {
+      val objects = minioClient.listObjects(
+        ListObjectsArgs.builder().bucket(bucket).recursive(true).build()
+      )
+      objects.asScala.toList.flatMap { resultItem =>
+        try {
+          val item       = resultItem.get()
+          val objectName = item.objectName()
+          val stat       = minioClient.statObject(
+            StatObjectArgs.builder().bucket(bucket).`object`(objectName).build()
+          )
+          val metadata = stat.userMetadata()
+          val filename = {
+            val exactKey = "x-amz-meta-original-filename"
+            Option(metadata.get(exactKey)).orElse {
+              metadata.asScala.collectFirst {
+                case (k, v) if k.toLowerCase.contains("original-filename") => v
               }
             }
-            val contentType = {
-              val exactKey = "x-amz-meta-content-type"
-              Option(metadata.get(exactKey)).orElse {
-                metadata.asScala.collectFirst {
-                  case (k, v) if k.toLowerCase.contains("content-type") => v
-                }
-              }.orElse(Option(stat.contentType()))
-            }
-            Some(
-              BlobInfo(
-                key = objectName,
-                filename = filename,
-                contentType = contentType,
-                size = Option(stat.size()),
-                created = Option(stat.lastModified()).map(_.toInstant)
-              )
-            )
-          } catch {
-            case _: Throwable => None
           }
+          val contentType = {
+            val exactKey = "x-amz-meta-content-type"
+            Option(metadata.get(exactKey)).orElse {
+              metadata.asScala.collectFirst {
+                case (k, v) if k.toLowerCase.contains("content-type") => v
+              }
+            }.orElse(Option(stat.contentType()))
+          }
+          Some(
+            BlobInfo(
+              key = objectName,
+              filename = filename,
+              contentType = contentType,
+              size = Option(stat.size()),
+              created = Option(stat.lastModified()).map(_.toInstant)
+            )
+          )
+        } catch {
+          case _: Throwable => None
         }
       }
     }
-
-  override def storeDocument(jobId: UUID, documentContent: String, mediaType: String): ZIO[Any, PipelineError, String] =
-    ErrorMapper.mapBlobStoreError {
-      for {
-        blobKey <- ZIO.succeed(UUID.randomUUID().toString)
-        filename = s"document-${java.lang.System.currentTimeMillis()}.$mediaType"
-        metadata = Map(
-                     "x-amz-meta-original-filename" -> filename,
-                     "x-amz-meta-content-type"      -> mediaType
-                   ).asJava
-        contentBytes <- ZIO.succeed(documentContent.getBytes("UTF-8"))
-        _            <- uploadBlobWithMetadata(blobKey, contentBytes, mediaType, metadata)
-      } yield blobKey
-    }
+  }
+    .mapError(error => PipelineError.BlobStoreError(error.getMessage, Some(error)))
 
   override def healthCheck(): Task[HealthStatus] =
     (ZIO.attemptBlocking(minioClient.listBuckets()) catchAll { t =>

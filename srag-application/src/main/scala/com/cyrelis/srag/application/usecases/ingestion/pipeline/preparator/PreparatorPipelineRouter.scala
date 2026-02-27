@@ -1,11 +1,10 @@
 package com.cyrelis.srag.application.usecases.ingestion.pipeline.preparator
 
 import com.cyrelis.srag.application.errors.PipelineError
+import com.cyrelis.srag.application.usecases.ingestion.pipeline.preparator.{AudioPreparatorPipeline, TextPreparatorPipeline}
 import com.cyrelis.srag.domain.ingestionjob.IngestionJob
 import com.cyrelis.srag.domain.transcript.{IngestSource, Transcript}
 import zio.*
-import com.cyrelis.srag.application.usecases.ingestion.pipeline.preparator.AudioPreparatorPipeline
-import com.cyrelis.srag.application.usecases.ingestion.pipeline.preparator.TextPreparatorPipeline
 
 trait PreparatorRouterPipeline {
   def dispatchAndPrepare(job: IngestionJob): ZIO[Any, PipelineError, Transcript]

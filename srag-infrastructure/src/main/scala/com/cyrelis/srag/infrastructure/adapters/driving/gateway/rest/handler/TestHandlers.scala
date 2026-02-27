@@ -4,12 +4,8 @@ import java.nio.file.Files
 import java.util.UUID
 
 import com.cyrelis.srag.application.errors.PipelineError
-import com.cyrelis.srag.application.ports.EmbedderPort
-import com.cyrelis.srag.application.ports.DocumentParserPort
-import com.cyrelis.srag.application.ports.RerankerPort
-import com.cyrelis.srag.application.ports.{BlobStorePort, LexicalStorePort, VectorStorePort}
-import com.cyrelis.srag.application.ports.TranscriberPort
 import com.cyrelis.srag.application.model.query.RerankerCandidate
+import com.cyrelis.srag.application.ports.{BlobStorePort, EmbedderPort, LexicalStorePort, RerankerPort, TranscriberPort, VectorStorePort}
 import com.cyrelis.srag.domain.transcript.{IngestSource, Transcript, TranscriptRepository, Word}
 import com.cyrelis.srag.infrastructure.adapters.driving.gateway.rest.dto.common.IngestSourceDto
 import com.cyrelis.srag.infrastructure.adapters.driving.gateway.rest.dto.test.*
@@ -86,16 +82,6 @@ object TestHandlers {
                   )
                 )
     } yield result).mapError(ErrorHandler.errorToString)
-
-  def handleDocumentParser(req: TestDocumentParserRestDto): ZIO[DocumentParserPort, String, TestResultRestDto] =
-    ZIO
-      .serviceWithZIO[DocumentParserPort](_.parseDocument(req.content, "application/pdf"))
-      .map(text =>
-        TestResultRestDto(
-          result = text.take(100)
-        )
-      )
-      .mapError(ErrorHandler.errorToString)
 
   def handleDatabase(
     req: TestDatabaseRestDto

@@ -31,14 +31,6 @@ object TestEndpoints {
       .errorOut(stringBody)
       .description("Test blob store adapter with multipart audio file")
 
-  val testDocumentParser: PublicEndpoint[TestDocumentParserRestDto, String, TestResultRestDto, Any] =
-    sttp.tapir.endpoint.post
-      .in("test" / "documentparser")
-      .in(jsonBody[TestDocumentParserRestDto])
-      .out(jsonBody[TestResultRestDto])
-      .errorOut(stringBody)
-      .description("Test document parser adapter")
-
   val testDatabase: PublicEndpoint[TestDatabaseRestDto, String, TestResultRestDto, Any] =
     sttp.tapir.endpoint.post
       .in("test" / "database")
@@ -101,7 +93,6 @@ object TestEndpoints {
       testTranscriber,
       testEmbedder,
       testBlobStore,
-      testDocumentParser,
       testDatabase,
       testVectorStore,
       testVectorStoreQuery,

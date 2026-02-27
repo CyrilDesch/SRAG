@@ -11,7 +11,6 @@ import com.cyrelis.srag.application.model.healthcheck.HealthStatus
 import com.cyrelis.srag.application.model.query.{RerankerCandidate, RerankerResult}
 import com.cyrelis.srag.application.ports.RerankerPort
 import com.cyrelis.srag.infrastructure.config.RerankerAdapterConfig
-import com.cyrelis.srag.infrastructure.resilience.ErrorMapper
 import io.circe.Codec
 import io.circe.syntax.*
 import sttp.client4.*
@@ -26,8 +25,10 @@ final case class TransformersRerankDocumentScore(document: String, score: Double
 final case class TransformersRerankResponse(query: String, scores: Option[List[TransformersRerankDocumentScore]])
     derives Codec
 
-private final class TransformersRerankerAdapter(config: RerankerAdapterConfig.Transformers, httpClient: HttpClient)
-    extends RerankerPort {
+private final class TransformersRerankerAdapter(
+  config: RerankerAdapterConfig.Transformers,
+  httpClient: HttpClient
+) extends RerankerPort {
 
   private val serviceName = s"TransformersReranker(${config.model})"
 
@@ -37,49 +38,49 @@ private final class TransformersRerankerAdapter(config: RerankerAdapterConfig.Tr
     query: String,
     candidates: List[RerankerCandidate],
     topK: Int
-  ): ZIO[Any, PipelineError, List[RerankerResult]] =
-    ErrorMapper.mapRerankerError {
-      if (candidates.isEmpty) ZIO.succeed(List.empty)
-      else
-        ZIO.scoped {
-          val limited          = candidates.take(topK)
-          val candidatesByText = mutable.Map.from(
-            limited.groupBy(_.text)
-          )
-          for {
-            backend    <- HttpClientZioBackend.scopedUsingClient(httpClient)
-            requestBody = TransformersRerankRequest(
-                            query = query,
-                            documents = limited.map(_.text)
-                          ).asJson.noSpaces
-            request = basicRequest
-                        .post(uri"$baseUrl/rerank")
-                        .contentType(MediaType.ApplicationJson)
-                        .body(requestBody)
-                        .response(asStringAlways)
-            response <- request.send(backend)
-            _        <- ZIO
-                   .when(!response.code.isSuccess)(
-                     ZIO.fail(
-                       new RuntimeException(s"Reranker request failed (${response.code.code}): ${response.body}")
-                     )
+  ): ZIO[Any, PipelineError, List[RerankerResult]] = {
+    if (candidates.isEmpty) ZIO.succeed(List.empty)
+    else
+      ZIO.scoped {
+        val limited          = candidates.take(topK)
+        val candidatesByText = mutable.Map.from(
+          limited.groupBy(_.text)
+        )
+        for {
+          backend    <- HttpClientZioBackend.scopedUsingClient(httpClient)
+          requestBody = TransformersRerankRequest(
+                          query = query,
+                          documents = limited.map(_.text)
+                        ).asJson.noSpaces
+          request = basicRequest
+                      .post(uri"$baseUrl/rerank")
+                      .contentType(MediaType.ApplicationJson)
+                      .body(requestBody)
+                      .response(asStringAlways)
+          response <- request.send(backend)
+          _        <- ZIO
+                 .when(!response.code.isSuccess)(
+                   ZIO.fail(
+                     new RuntimeException(s"Reranker request failed (${response.code.code}): ${response.body}")
                    )
-            rerankResponse <-
-              ZIO
-                .fromEither(io.circe.parser.decode[TransformersRerankResponse](response.body))
-                .mapError(err => new RuntimeException(s"Failed to decode reranker response: ${err.getMessage}"))
-            results = rerankResponse.scores.toList.flatten.flatMap { item =>
-                        candidatesByText.get(item.document).flatMap {
-                          case head :: tail =>
-                            candidatesByText.update(item.document, tail)
-                            Some(RerankerResult(candidate = head, score = item.score))
-                          case Nil =>
-                            None
-                        }
+                 )
+          rerankResponse <-
+            ZIO
+              .fromEither(io.circe.parser.decode[TransformersRerankResponse](response.body))
+              .mapError(err => new RuntimeException(s"Failed to decode reranker response: ${err.getMessage}"))
+          results = rerankResponse.scores.toList.flatten.flatMap { item =>
+                      candidatesByText.get(item.document).flatMap {
+                        case head :: tail =>
+                          candidatesByText.update(item.document, tail)
+                          Some(RerankerResult(candidate = head, score = item.score))
+                        case Nil =>
+                          None
                       }
-          } yield results
-        }
-    }
+                    }
+        } yield results
+      }
+  }
+    .mapError(error => PipelineError.RerankerError(error.getMessage, Some(error)))
 
   override def healthCheck(): Task[HealthStatus] = {
     val now = Instant.now()

@@ -37,15 +37,6 @@ object MainEndpoints {
       .errorOut(stringBody)
       .description("Ingest raw text content")
 
-  val ingestDocument: PublicEndpoint[DocumentIngestRestDto, String, JobAcceptedRestDto, Any] =
-    sttp.tapir.endpoint.post
-      .in("api" / "v1" / "ingest" / "document")
-      .in(jsonBody[DocumentIngestRestDto])
-      .out(statusCode(StatusCode.Accepted))
-      .out(jsonBody[JobAcceptedRestDto])
-      .errorOut(stringBody)
-      .description("Ingest base64-encoded document content")
-
   val jobStatus: PublicEndpoint[String, String, JobStatusRestDto, Any] =
     sttp.tapir.endpoint.get
       .in("api" / "v1" / "jobs" / path[String]("jobId"))
@@ -120,5 +111,5 @@ object MainEndpoints {
       )
 
   def all: List[PublicEndpoint[?, ?, ?, ?]] =
-    List(health, ingestAudioMultipart, ingestText, ingestDocument, jobStatus, transcripts, getFile, query)
+    List(health, ingestAudioMultipart, ingestText, jobStatus, transcripts, getFile, query)
 }
