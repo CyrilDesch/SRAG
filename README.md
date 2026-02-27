@@ -161,7 +161,7 @@ sbt srag-infrastructure/test
 
 ## 🦾 LLM Usage
 
-You can use an LLM to generate code/documentation **that you will review**. The rules are in the `.llmrules/` folder. You can duplicate it to adapt the rules for Claude Code, Cursor, etc.
+You can use an LLM to generate code/documentation **that you will review**. The rules are in the `docs/llmrules` folder. You can duplicate it to adapt the rules for Claude Code, Cursor, etc.
 
 ## 📝 Roadmap
 

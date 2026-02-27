@@ -187,6 +187,7 @@ description: Always-applied SRAG Scala 3 + ZIO development rules and engineering
 ## Build and Delivery Discipline
 
 - Compile and run tests after every code change.
+- Always run sbt scalafmt fix/check and test.
 - Keep formatter, linter, compile, and test in CI and local workflows.
 - Favor reproducible builds and automated delivery pipelines.
 - Keep operational behavior explicit (config profiles, startup checks, health checks).

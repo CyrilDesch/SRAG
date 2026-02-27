@@ -3,7 +3,14 @@ package com.cyrelis.srag.infrastructure.adapters.driving.gateway.rest
 import java.nio.charset.StandardCharsets
 
 import com.cyrelis.srag.application.errors.PipelineError
-import com.cyrelis.srag.application.ports.{BlobStorePort, EmbedderPort, LexicalStorePort, RerankerPort, TranscriberPort, VectorStorePort}
+import com.cyrelis.srag.application.ports.{
+  BlobStorePort,
+  EmbedderPort,
+  LexicalStorePort,
+  RerankerPort,
+  TranscriberPort,
+  VectorStorePort
+}
 import com.cyrelis.srag.application.usecases.healthcheck.HealthCheckService
 import com.cyrelis.srag.application.usecases.ingestion.IngestService
 import com.cyrelis.srag.application.usecases.query.QueryService

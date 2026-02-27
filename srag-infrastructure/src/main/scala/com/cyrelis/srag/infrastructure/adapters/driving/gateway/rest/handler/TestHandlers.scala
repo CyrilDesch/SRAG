@@ -5,7 +5,14 @@ import java.util.UUID
 
 import com.cyrelis.srag.application.errors.PipelineError
 import com.cyrelis.srag.application.model.query.RerankerCandidate
-import com.cyrelis.srag.application.ports.{BlobStorePort, EmbedderPort, LexicalStorePort, RerankerPort, TranscriberPort, VectorStorePort}
+import com.cyrelis.srag.application.ports.{
+  BlobStorePort,
+  EmbedderPort,
+  LexicalStorePort,
+  RerankerPort,
+  TranscriberPort,
+  VectorStorePort
+}
 import com.cyrelis.srag.domain.transcript.{IngestSource, Transcript, TranscriptRepository, Word}
 import com.cyrelis.srag.infrastructure.adapters.driving.gateway.rest.dto.common.IngestSourceDto
 import com.cyrelis.srag.infrastructure.adapters.driving.gateway.rest.dto.test.*

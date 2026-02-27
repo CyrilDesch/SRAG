@@ -4,16 +4,19 @@ on:
   push:
     branches:
       - main
-      - development
+  release:
+    types:
+      - published
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  IMAGE_NAMESPACE: cyrildesch
+  IMAGE_NAME: srag
 
 jobs:
   quality-check:
     name: Quality Check
-    uses: ./.github/workflows/quality.yml
+    uses: ./.github/workflows/quality-check.yml
 
   docker-build-push:
     name: Build and Push Docker Image
@@ -28,12 +31,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
-
-      - name: Set lowercase image name
-        run: echo "IMAGE_NAME_LOWER=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
-
-      - name: Set safe branch name
-        run: echo "SAFE_BRANCH_NAME=$(echo '${{ github.ref_name }}' | sed 's/[^a-zA-Z0-9._-]/-/g')" >> $GITHUB_ENV
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -68,20 +65,34 @@ jobs:
       - name: Build Docker image with sbt
         run: sbt "srag-infrastructure/Docker/publishLocal"
 
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=beta,enable=${{ github.event_name == 'push' && github.ref_name == 'main' }}
+            type=sha,format=short,prefix=beta-,enable=${{ github.event_name == 'push' && github.ref_name == 'main' }}
+            type=raw,value=latest,enable=${{ github.event_name == 'release' }}
+            type=ref,event=tag,enable=${{ github.event_name == 'release' }}
+
       - name: Tag and push Docker image
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
         run: |
           # Get the actual image name from sbt Docker plugin
-          LOCAL_IMAGE_NAME=$(docker images --format "table {{.Repository}}:{{.Tag}}" | grep srag | head -1)
+          LOCAL_IMAGE_NAME=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "srag(:|$)" | head -1)
+          if [ -z "$LOCAL_IMAGE_NAME" ]; then
+            echo "Could not find local Docker image matching 'srag'" >&2
+            exit 1
+          fi
           echo "Local image: $LOCAL_IMAGE_NAME"
 
-          # Create proper tags for GitHub Container Registry
-          NEW_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:${{ env.SAFE_BRANCH_NAME }}-${{ github.sha }}"
-          docker tag "$LOCAL_IMAGE_NAME" "$NEW_TAG"
-          docker push "$NEW_TAG"
+          echo "Target tags:"
+          echo "$TAGS"
 
-          # Tag as latest for main branch
-          if [ "${{ github.ref_name }}" = "main" ]; then
-            LATEST_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:latest"
-            docker tag "$LOCAL_IMAGE_NAME" "$LATEST_TAG"
-            docker push "$LATEST_TAG"
-          fi
+          while IFS= read -r tag; do
+            [ -z "$tag" ] && continue
+            docker tag "$LOCAL_IMAGE_NAME" "$tag"
+            docker push "$tag"
+          done <<< "$TAGS"
