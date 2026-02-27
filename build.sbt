@@ -15,7 +15,7 @@ inThisBuild(
     dependencyOverrides ++= Seq(
       "org.scala-lang"      %% "scala3-library" % scala3,
       "dev.zio"             %% "zio-json"       % "0.9.0",
-      "com.squareup.okhttp3" % "okhttp"         % "4.12.0"
+      "com.squareup.okhttp3" % "okhttp"         % "5.3.2"
     ),
     semanticdbEnabled := true,
     semanticdbVersion := scalafixSemanticdb.revision,
