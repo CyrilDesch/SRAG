@@ -12,7 +12,7 @@ object Dependencies {
     val postgresql  = "42.7.5"
     val quill       = "4.8.6"
     val slf4j       = "2.0.17"
-    val sttp        = "4.0.12"
+    val sttp        = "4.0.19"
     val tapir       = "1.11.24"
     val zio         = "2.1.17"
     val zioConfig   = "4.0.2"
