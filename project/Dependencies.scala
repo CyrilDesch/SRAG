@@ -16,7 +16,7 @@ object Dependencies {
     val tapir       = "1.11.24"
     val zio         = "2.1.17"
     val zioConfig   = "4.0.2"
-    val zioLogging  = "2.2.4"
+    val zioLogging  = "2.5.3"
     val zioPrelude  = "1.0.0-RC36"
   }
 
