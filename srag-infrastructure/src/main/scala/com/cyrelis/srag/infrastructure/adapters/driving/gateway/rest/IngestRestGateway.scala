@@ -3,12 +3,17 @@ package com.cyrelis.srag.infrastructure.adapters.driving.gateway.rest
 import java.nio.charset.StandardCharsets
 
 import com.cyrelis.srag.application.errors.PipelineError
-import com.cyrelis.srag.application.ports.driven.embedding.EmbedderPort
-import com.cyrelis.srag.application.ports.driven.parser.DocumentParserPort
-import com.cyrelis.srag.application.ports.driven.reranker.RerankerPort
-import com.cyrelis.srag.application.ports.driven.storage.{BlobStorePort, LexicalStorePort, VectorStorePort}
-import com.cyrelis.srag.application.ports.driven.transcription.TranscriberPort
-import com.cyrelis.srag.application.ports.driving.{HealthCheckPort, IngestPort, QueryPort}
+import com.cyrelis.srag.application.ports.{
+  BlobStorePort,
+  EmbedderPort,
+  LexicalStorePort,
+  RerankerPort,
+  TranscriberPort,
+  VectorStorePort
+}
+import com.cyrelis.srag.application.usecases.healthcheck.HealthCheckService
+import com.cyrelis.srag.application.usecases.ingestion.IngestService
+import com.cyrelis.srag.application.usecases.query.QueryService
 import com.cyrelis.srag.domain.ingestionjob.IngestionJobRepository
 import com.cyrelis.srag.domain.transcript.TranscriptRepository
 import com.cyrelis.srag.infrastructure.adapters.driving.Gateway
@@ -35,11 +40,12 @@ final class IngestRestGateway(
   maxBodySizeBytes: Long
 ) extends Gateway {
 
-  type TestEnv = TranscriberPort & EmbedderPort & BlobStorePort & DocumentParserPort &
+  type TestEnv = TranscriberPort & EmbedderPort & BlobStorePort &
     TranscriptRepository[[X] =>> ZIO[Any, PipelineError, X]] & VectorStorePort & LexicalStorePort & RerankerPort &
     IngestionJobRepository[[X] =>> ZIO[Any, PipelineError, X]]
 
-  private def buildRoutes: ZIO[IngestPort & HealthCheckPort & QueryPort & TestEnv, Nothing, Routes[Any, Response]] =
+  private def buildRoutes
+    : ZIO[IngestService & HealthCheckService & QueryService & TestEnv, Nothing, Routes[Any, Response]] =
     for {
       mainRoutes   <- buildMainRoutes
       testRoutes   <- buildTestRoutes
@@ -49,14 +55,15 @@ final class IngestRestGateway(
     } yield docsRoutes ++ mainRoutes ++ testRoutes ++ testUiRoutes ++ staticRoutes
 
   private def buildMainRoutes: ZIO[
-    IngestPort & HealthCheckPort & QueryPort & BlobStorePort & TranscriptRepository[[X] =>> ZIO[Any, PipelineError, X]],
+    IngestService & HealthCheckService & QueryService & BlobStorePort &
+      TranscriptRepository[[X] =>> ZIO[Any, PipelineError, X]],
     Nothing,
     Routes[Any, Response]
   ] =
     for {
-      ingestPort      <- ZIO.service[IngestPort]
-      healthCheckPort <- ZIO.service[HealthCheckPort]
-      queryPort       <- ZIO.service[QueryPort]
+      ingestPort      <- ZIO.service[IngestService]
+      healthCheckPort <- ZIO.service[HealthCheckService]
+      queryPort       <- ZIO.service[QueryService]
       blobStore       <- ZIO.service[BlobStorePort]
       transcriptRepo  <- ZIO.service[TranscriptRepository[[X] =>> ZIO[Any, PipelineError, X]]]
     } yield ZioHttpInterpreter().toHttp(
@@ -66,9 +73,6 @@ final class IngestRestGateway(
           MainHandlers.handleIngestAudio(_).provide(ZLayer.succeed(ingestPort))
         ),
         MainEndpoints.ingestText.zServerLogic(MainHandlers.handleIngestText(_).provide(ZLayer.succeed(ingestPort))),
-        MainEndpoints.ingestDocument.zServerLogic(
-          MainHandlers.handleIngestDocument(_).provide(ZLayer.succeed(ingestPort))
-        ),
         MainEndpoints.jobStatus.zServerLogic(
           MainHandlers.handleGetJobStatus(_).provide(ZLayer.succeed(ingestPort))
         ),
@@ -101,14 +105,13 @@ final class IngestRestGateway(
 
   private def buildTestRoutes: ZIO[TestEnv, Nothing, Routes[Any, Response]] =
     for {
-      transcriber    <- ZIO.service[TranscriberPort]
-      embedder       <- ZIO.service[EmbedderPort]
-      blobStore      <- ZIO.service[BlobStorePort]
-      documentParser <- ZIO.service[DocumentParserPort]
-      dbSink         <- ZIO.service[TranscriptRepository[[X] =>> ZIO[Any, PipelineError, X]]]
-      vectorSink     <- ZIO.service[VectorStorePort]
-      lexicalStore   <- ZIO.service[LexicalStorePort]
-      reranker       <- ZIO.service[RerankerPort]
+      transcriber  <- ZIO.service[TranscriberPort]
+      embedder     <- ZIO.service[EmbedderPort]
+      blobStore    <- ZIO.service[BlobStorePort]
+      dbSink       <- ZIO.service[TranscriptRepository[[X] =>> ZIO[Any, PipelineError, X]]]
+      vectorSink   <- ZIO.service[VectorStorePort]
+      lexicalStore <- ZIO.service[LexicalStorePort]
+      reranker     <- ZIO.service[RerankerPort]
     } yield ZioHttpInterpreter().toHttp(
       List(
         TestEndpoints.testTranscriber.zServerLogic(
@@ -116,9 +119,6 @@ final class IngestRestGateway(
         ),
         TestEndpoints.testEmbedder.zServerLogic(TestHandlers.handleEmbedder(_).provide(ZLayer.succeed(embedder))),
         TestEndpoints.testBlobStore.zServerLogic(TestHandlers.handleBlobStore(_).provide(ZLayer.succeed(blobStore))),
-        TestEndpoints.testDocumentParser.zServerLogic(
-          TestHandlers.handleDocumentParser(_).provide(ZLayer.succeed(documentParser))
-        ),
         TestEndpoints.testDatabase.zServerLogic(TestHandlers.handleDatabase(_).provide(ZLayer.succeed(dbSink))),
         TestEndpoints.testVectorStore.zServerLogic(
           TestHandlers.handleVectorStore(_).provide(ZLayer.succeed(vectorSink) ++ ZLayer.succeed(embedder))
@@ -200,7 +200,7 @@ final class IngestRestGateway(
       )
     }
 
-  def startWithDeps: ZIO[Scope & IngestPort & HealthCheckPort & QueryPort & TestEnv, Throwable, Unit] =
+  def startWithDeps: ZIO[Scope & IngestService & HealthCheckService & QueryService & TestEnv, Throwable, Unit] =
     for {
       routes <- buildRoutes
       _      <- ZIO.logInfo(s"REST server will listen on $host:$port")

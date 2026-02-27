@@ -62,13 +62,11 @@ object TranscriptRow:
 
   private def sourceToString(source: IngestSource): String =
     source match
-      case IngestSource.Audio    => "Audio"
-      case IngestSource.Text     => "Text"
-      case IngestSource.Document => "Document"
+      case IngestSource.Audio => "Audio"
+      case IngestSource.Text  => "Text"
 
   private def stringToSource(source: String): IngestSource =
     source match
-      case "Audio"    => IngestSource.Audio
-      case "Text"     => IngestSource.Text
-      case "Document" => IngestSource.Document
-      case _          => IngestSource.Text
+      case "Audio" => IngestSource.Audio
+      case "Text"  => IngestSource.Text
+      case _       => IngestSource.Text

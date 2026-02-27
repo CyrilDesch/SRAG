@@ -48,7 +48,9 @@ lazy val `srag-domain` = project
   .disablePlugins(RevolverPlugin)
   .settings(
     domainLibraryDependencies,
-    publish / skip := true
+    testingLibraryDependencies,
+    Test / discoveredMainClasses := Seq.empty,
+    publish / skip               := true
   )
 
 lazy val `srag-application` = project
@@ -57,7 +59,9 @@ lazy val `srag-application` = project
   .dependsOn(`srag-domain`)
   .settings(
     applicationLibraryDependencies,
-    publish / skip := true
+    testingLibraryDependencies,
+    Test / discoveredMainClasses := Seq.empty,
+    publish / skip               := true
   )
 
 lazy val `srag-infrastructure` = project
@@ -69,7 +73,8 @@ lazy val `srag-infrastructure` = project
     mainClass := Some("com.cyrelis.srag.infrastructure.Main"),
     infrastructureLibraryDependencies,
     testingLibraryDependencies,
-    publish / skip := true
+    Test / discoveredMainClasses := Seq.empty,
+    publish / skip               := true
   )
   .settings(dockerSettings)
   .settings(assemblySettings)
@@ -119,8 +124,7 @@ lazy val assemblySettings = {
         name.contains("scalap") ||
         name.contains("test") ||
         name.contains("junit") ||
-        name.contains("scalatest") ||
-        name.contains("munit")
+        name.contains("scalatest")
       }
     }
   )

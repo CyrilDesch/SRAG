@@ -1,6 +1,6 @@
 package com.cyrelis.srag.infrastructure.adapters.driving.gateway.rest.dto.main
 
-import com.cyrelis.srag.application.types.ContextSegment
+import com.cyrelis.srag.application.model.query.ContextSegment
 import io.circe.Codec
 
 final case class QueryResponseDto(

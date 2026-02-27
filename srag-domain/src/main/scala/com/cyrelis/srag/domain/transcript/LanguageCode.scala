@@ -2,15 +2,17 @@ package com.cyrelis.srag.domain.transcript
 
 import scala.util.matching.Regex
 
+import com.cyrelis.srag.domain.error.DomainError
+
 /** ISO 639-1 language code (2-letter code) */
 opaque type LanguageCode = String
 
 object LanguageCode:
   private val iso6391Pattern: Regex = "^[a-z]{2}$".r
 
-  def apply(code: String): LanguageCode =
-    if (isValid(code)) code.toLowerCase
-    else throw new IllegalArgumentException(s"Invalid ISO 639-1 language code: $code")
+  def apply(code: String): Either[DomainError, LanguageCode] =
+    if (isValid(code)) Right(code.toLowerCase)
+    else Left(DomainError.InvalidInput(s"Invalid ISO 639-1 language code: $code"))
 
   def unsafe(code: String): LanguageCode = code.toLowerCase
 

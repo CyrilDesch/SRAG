@@ -6,11 +6,10 @@ import java.util.UUID
 
 import scala.concurrent.duration.*
 
-import com.cyrelis.srag.application.ports.driven.transcription.TranscriberPort
-import com.cyrelis.srag.application.types.HealthStatus
+import com.cyrelis.srag.application.model.healthcheck.HealthStatus
+import com.cyrelis.srag.application.ports.TranscriberPort
 import com.cyrelis.srag.domain.transcript.{IngestSource, LanguageCode, Transcript, Word}
 import com.cyrelis.srag.infrastructure.config.TranscriberAdapterConfig
-import com.cyrelis.srag.infrastructure.resilience.ErrorMapper
 import io.circe.Codec
 import io.circe.parser.*
 import io.circe.syntax.*
@@ -56,13 +55,10 @@ final case class AssemblyAIWord(
   speaker: Option[String] = None
 ) derives Codec
 
-class AssemblyAIAdapter(config: TranscriberAdapterConfig.AssemblyAI) extends TranscriberPort {
-
-  private val httpClient: HttpClient =
-    HttpClient
-      .newBuilder()
-      .version(HttpClient.Version.HTTP_1_1)
-      .build()
+private final class AssemblyAIAdapter(
+  config: TranscriberAdapterConfig.AssemblyAI,
+  httpClient: HttpClient
+) extends TranscriberPort {
 
   private val baseUrl = s"https://${config.apiUrl}"
   private val apiKey  = config.apiKey
@@ -75,7 +71,7 @@ class AssemblyAIAdapter(config: TranscriberAdapterConfig.AssemblyAI) extends Tra
     val transcriptId = UUID.randomUUID()
     val now          = Instant.now()
 
-    ErrorMapper.mapTranscriptionError {
+    val effect =
       for {
         uploadUrl              <- uploadAudioFile(audioContent, mediaContentType, mediaFilename)
         _                      <- ZIO.logDebug(s"Audio file uploaded to AssemblyAI: $uploadUrl")
@@ -85,7 +81,10 @@ class AssemblyAIAdapter(config: TranscriberAdapterConfig.AssemblyAI) extends Tra
         _                      <- ZIO.logDebug(s"Transcript completed: ${transcriptResponse.id}")
         transcript             <- buildTranscript(transcriptId, transcriptResponse, now)
       } yield transcript
-    }
+
+    effect.mapError(error =>
+      com.cyrelis.srag.application.errors.PipelineError.TranscriptionError(error.getMessage, Some(error))
+    )
   }
 
   private def uploadAudioFile(
@@ -385,4 +384,16 @@ class AssemblyAIAdapter(config: TranscriberAdapterConfig.AssemblyAI) extends Tra
       })
     }
   }
+}
+
+object AssemblyAIAdapter {
+  val layer: ZLayer[TranscriberAdapterConfig.AssemblyAI, Throwable, TranscriberPort] =
+    ZLayer.scoped {
+      for {
+        config <- ZIO.service[TranscriberAdapterConfig.AssemblyAI]
+        client <- ZIO.fromAutoCloseable(
+                    ZIO.attemptBlocking(HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build())
+                  )
+      } yield new AssemblyAIAdapter(config, client)
+    }
 }

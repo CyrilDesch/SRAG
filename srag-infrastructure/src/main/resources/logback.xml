@@ -8,17 +8,17 @@
     </appender>
 
     <!-- Root logger level - controlled by application config -->
-    <root level="${LOG_LEVEL:-INFO}">
+    <root level="${GLOBAL_LOG_LEVEL:-INFO}">
         <appender-ref ref="CONSOLE" />
     </root>
 
     <!-- Specific logger levels -->
-    <logger name="srag" level="${LOG_LEVEL:-INFO}" additivity="false">
+    <logger name="srag" level="${SRAG_LOG_LEVEL:-INFO}" additivity="false">
         <appender-ref ref="CONSOLE" />
     </logger>
-    <logger name="com.cyrelis.srag" level="DEBUG" />
-    <logger name="io.getquill" level="WARN" />
-    <logger name="com.zaxxer.hikari" level="WARN" />
-    <logger name="org.flywaydb" level="INFO" />
-    <logger name="io.minio" level="WARN" />
+    
+    <logger name="io.getquill" level="${QUILL_LOG_LEVEL:-WARN}" />
+    <logger name="com.zaxxer.hikari" level="${HIKARI_LOG_LEVEL:-WARN}" />
+    <logger name="org.flywaydb" level="${FLYWAY_LOG_LEVEL:-WARN}" />
+    <logger name="io.minio" level="${MINIO_LOG_LEVEL:-WARN}" />
 </configuration>

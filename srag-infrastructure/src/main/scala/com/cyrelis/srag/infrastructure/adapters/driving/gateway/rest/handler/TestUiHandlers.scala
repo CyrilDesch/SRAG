@@ -1,7 +1,7 @@
 package com.cyrelis.srag.infrastructure.adapters.driving.gateway.rest.handler
 
 import com.cyrelis.srag.application.errors.PipelineError
-import com.cyrelis.srag.application.ports.driven.storage.{BlobStorePort, LexicalStorePort, VectorStorePort}
+import com.cyrelis.srag.application.ports.{BlobStorePort, LexicalStorePort, VectorStorePort}
 import com.cyrelis.srag.domain.ingestionjob.IngestionJobRepository
 import com.cyrelis.srag.infrastructure.adapters.driving.gateway.rest.dto.testui.*
 import com.cyrelis.srag.infrastructure.adapters.driving.gateway.rest.error.ErrorHandler

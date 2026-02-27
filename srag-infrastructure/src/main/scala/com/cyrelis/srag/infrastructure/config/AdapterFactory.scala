@@ -1,13 +1,16 @@
 package com.cyrelis.srag.infrastructure.config
 
 import com.cyrelis.srag.application.errors.PipelineError
-import com.cyrelis.srag.application.ports.driven.datasource.DatasourcePort
-import com.cyrelis.srag.application.ports.driven.embedding.EmbedderPort
-import com.cyrelis.srag.application.ports.driven.job.JobQueuePort
-import com.cyrelis.srag.application.ports.driven.parser.DocumentParserPort
-import com.cyrelis.srag.application.ports.driven.reranker.RerankerPort
-import com.cyrelis.srag.application.ports.driven.storage.{BlobStorePort, LexicalStorePort, VectorStorePort}
-import com.cyrelis.srag.application.ports.driven.transcription.TranscriberPort
+import com.cyrelis.srag.application.ports.{
+  BlobStorePort,
+  DatasourcePort,
+  EmbedderPort,
+  JobQueuePort,
+  LexicalStorePort,
+  RerankerPort,
+  TranscriberPort,
+  VectorStorePort
+}
 import com.cyrelis.srag.domain.ingestionjob.IngestionJobRepository
 import com.cyrelis.srag.domain.transcript.TranscriptRepository
 import com.cyrelis.srag.infrastructure.adapters.driven.blobstore.MinioAdapter
@@ -16,7 +19,6 @@ import com.cyrelis.srag.infrastructure.adapters.driven.database.postgres.{
   PostgresJobRepository,
   PostgresTranscriptRepository
 }
-import com.cyrelis.srag.infrastructure.adapters.driven.documentparser.PdfBoxParser
 import com.cyrelis.srag.infrastructure.adapters.driven.embedder.HuggingFaceAdapter
 import com.cyrelis.srag.infrastructure.adapters.driven.lexicalstore.OpenSearchAdapter
 import com.cyrelis.srag.infrastructure.adapters.driven.queue.RedisJobQueueAdapter
@@ -32,83 +34,72 @@ object AdapterFactory {
   def createDatasourceLayer(config: DatabaseAdapterConfig): ZLayer[Any, Throwable, DatasourcePort] =
     config match {
       case cfg: DatabaseAdapterConfig.Postgres =>
-        PostgresDatasource.layer(cfg).map(ds => ZEnvironment(ds.get: DatasourcePort))
+        ZLayer.succeed(cfg) >>> PostgresDatasource.layer
     }
 
   def createTranscriptRepositoryLayer(
     config: DatabaseAdapterConfig
-  ): ZLayer[DatasourcePort, Nothing, TranscriptRepository[[X] =>> ZIO[Any, PipelineError, X]]] =
+  ): ZLayer[DatasourcePort, Throwable, TranscriptRepository[[X] =>> ZIO[Any, PipelineError, X]]] =
     config match {
       case _: DatabaseAdapterConfig.Postgres =>
-        ZLayer.fromFunction { (datasource: DatasourcePort) =>
-          val quillDatasource = datasource.asInstanceOf[PostgresDatasource]
-          new PostgresTranscriptRepository(quillDatasource.quillContext)
-        }
+        PostgresTranscriptRepository.layer
     }
 
   def createJobRepositoryLayer(
     config: DatabaseAdapterConfig
-  ): ZLayer[DatasourcePort, Nothing, IngestionJobRepository[[X] =>> ZIO[Any, PipelineError, X]]] =
+  ): ZLayer[DatasourcePort, Throwable, IngestionJobRepository[[X] =>> ZIO[Any, PipelineError, X]]] =
     config match {
       case _: DatabaseAdapterConfig.Postgres =>
-        ZLayer.fromFunction { (datasource: DatasourcePort) =>
-          val quillDatasource = datasource.asInstanceOf[PostgresDatasource]
-          new PostgresJobRepository(quillDatasource.quillContext)
-        }
+        PostgresJobRepository.layer
     }
 
-  def createVectorStoreAdapter(config: VectorStoreAdapterConfig): VectorStorePort =
+  def createVectorStoreLayer(config: VectorStoreAdapterConfig): ZLayer[Any, Throwable, VectorStorePort] =
     config match {
       case cfg: VectorStoreAdapterConfig.Qdrant =>
-        new QdrantAdapter(cfg)
+        ZLayer.succeed(cfg) >>> QdrantAdapter.layer
     }
 
-  def createLexicalStoreAdapter(config: LexicalStoreAdapterConfig): LexicalStorePort =
+  def createLexicalStoreLayer(config: LexicalStoreAdapterConfig): ZLayer[Any, Throwable, LexicalStorePort] =
     config match {
       case cfg: LexicalStoreAdapterConfig.OpenSearch =>
-        new OpenSearchAdapter(cfg)
+        ZLayer.succeed(cfg) >>> OpenSearchAdapter.layer
     }
 
-  def createRerankerAdapter(config: RerankerAdapterConfig): RerankerPort =
+  def createRerankerLayer(config: RerankerAdapterConfig): ZLayer[Any, Throwable, RerankerPort] =
     config match {
       case cfg: RerankerAdapterConfig.Transformers =>
-        new TransformersRerankerAdapter(cfg)
+        ZLayer.succeed(cfg) >>> TransformersRerankerAdapter.layer
     }
 
-  def createTranscriberAdapter(config: TranscriberAdapterConfig): TranscriberPort =
+  def createTranscriberLayer(config: TranscriberAdapterConfig): ZLayer[Any, Throwable, TranscriberPort] =
     config match {
       case cfg: TranscriberAdapterConfig.Whisper =>
-        new WhisperAdapter(cfg)
+        ZLayer.succeed(cfg) >>> WhisperAdapter.layer
       case cfg: TranscriberAdapterConfig.AssemblyAI =>
-        new AssemblyAIAdapter(cfg)
+        ZLayer.succeed(cfg) >>> AssemblyAIAdapter.layer
     }
 
-  def createEmbedderAdapter(config: EmbedderAdapterConfig): EmbedderPort =
+  def createEmbedderLayer(config: EmbedderAdapterConfig): ZLayer[Any, Throwable, EmbedderPort] =
     config match {
       case cfg: EmbedderAdapterConfig.HuggingFace =>
-        new HuggingFaceAdapter(cfg)
+        ZLayer.succeed(cfg) >>> HuggingFaceAdapter.layer
     }
 
-  def createBlobStoreAdapter(config: BlobStoreAdapterConfig): BlobStorePort =
+  def createBlobStoreLayer(config: BlobStoreAdapterConfig): ZLayer[Any, Throwable, BlobStorePort] =
     config match {
       case cfg: BlobStoreAdapterConfig.MinIO =>
-        new MinioAdapter(cfg.host, cfg.port, cfg.accessKey, cfg.secretKey, cfg.bucket)
+        ZLayer.succeed(cfg) >>> MinioAdapter.layer
     }
-
-  def createDocumentParserAdapter(): DocumentParserPort =
-    new PdfBoxParser()
 
   def createJobQueueLayer(config: JobQueueAdapterConfig): ZLayer[Any, Throwable, JobQueuePort] =
     config match {
       case cfg: JobQueueAdapterConfig.Redis =>
-        RedisJobQueueAdapter.layerFromConfig(cfg)
+        ZLayer.succeed(cfg) >>> RedisJobQueueAdapter.layer
     }
 
   def createGateway(config: ApiAdapterConfig): Gateway =
     config match {
       case ApiAdapterConfig.REST(host, port, maxBodySizeBytes) =>
         new IngestRestGateway(host, port, maxBodySizeBytes)
-      case ApiAdapterConfig.GRPC(host, port) =>
-        throw new UnsupportedOperationException("gRPC gateway not yet implemented")
     }
 }

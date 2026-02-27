@@ -33,7 +33,7 @@ object VectorStoreInitializer {
     private val baseUrl = config.url.stripSuffix("/")
 
     private def buildHeaders(): Map[String, String] =
-      if (config.apiKey.nonEmpty) Map("api-key" -> config.apiKey) else Map.empty
+      if (config.apiKey.nonEmpty) Map("api-key" -> config.apiKey.get) else Map.empty
 
     override def initialize(): Task[Unit] =
       ZIO.logInfo(s"Initializing Qdrant collection: ${config.collection}") *>

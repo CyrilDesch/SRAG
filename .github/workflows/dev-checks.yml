@@ -2,15 +2,8 @@ name: Development Checks
 
 on:
   pull_request:
-    branches-ignore:
-      - main
-      - development
-  push:
-    branches-ignore:
-      - main
-      - development
 
 jobs:
   quality-check:
     name: Quality Check
-    uses: ./.github/workflows/quality.yml
+    uses: ./.github/workflows/quality-check.yml
