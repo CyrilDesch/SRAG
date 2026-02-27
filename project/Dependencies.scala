@@ -5,7 +5,7 @@ object Dependencies {
   object Versions {
     val auth0       = "4.5.0"
     val circe       = "0.14.14"
-    val flywaydb    = "11.8.1"
+    val flywaydb    = "11.8.2"
     val langchain4j = "0.29.0"
     val logback     = "1.5.18"
     val minio       = "8.5.10"
