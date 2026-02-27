@@ -3,21 +3,21 @@ import sbt.Keys.*
 
 object Dependencies {
   object Versions {
-    val auth0       = "4.5.0"
-    val circe       = "0.14.14"
-    val flywaydb    = "11.8.1"
-    val langchain4j = "0.29.0"
-    val logback     = "1.5.18"
-    val minio       = "8.5.10"
-    val postgresql  = "42.7.5"
+    val auth0       = "4.5.1"
+    val circe       = "0.14.15"
+    val flywaydb    = "11.8.2"
+    val langchain4j = "0.29.1"
+    val logback     = "1.5.32"
+    val minio       = "8.5.17"
+    val postgresql  = "42.7.10"
     val quill       = "4.8.6"
     val slf4j       = "2.0.17"
-    val sttp        = "4.0.12"
-    val tapir       = "1.11.24"
-    val zio         = "2.1.17"
-    val zioConfig   = "4.0.2"
-    val zioLogging  = "2.2.4"
-    val zioPrelude  = "1.0.0-RC36"
+    val sttp        = "4.0.19"
+    val tapir       = "1.11.50"
+    val zio         = "2.1.24"
+    val zioConfig   = "4.0.6"
+    val zioLogging  = "2.5.3"
+    val zioPrelude  = "1.0.0-RC46"
   }
 
   private val zioCoreDependencies = Seq(
@@ -48,7 +48,7 @@ object Dependencies {
   )
 
   private val redisDependencies = Seq(
-    "redis.clients" % "jedis" % "5.1.3"
+    "redis.clients" % "jedis" % "5.1.5"
   )
 
   private val minioDependencies = Seq(
@@ -67,7 +67,7 @@ object Dependencies {
     libraryDependencies ++= Seq(
       "dev.zio"       %% "zio-test"     % Versions.zio % Test,
       "dev.zio"       %% "zio-test-sbt" % Versions.zio % Test,
-      "org.scalamock" %% "scalamock"    % "6.0.0"      % Test
+      "org.scalamock" %% "scalamock"    % "6.2.0"      % Test
     )
 
   val domainLibraryDependencies: Setting[Seq[ModuleID]] =
