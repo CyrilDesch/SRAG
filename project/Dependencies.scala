@@ -67,7 +67,7 @@ object Dependencies {
     libraryDependencies ++= Seq(
       "dev.zio"       %% "zio-test"     % Versions.zio % Test,
       "dev.zio"       %% "zio-test-sbt" % Versions.zio % Test,
-      "org.scalamock" %% "scalamock"    % "6.0.0"      % Test
+      "org.scalamock" %% "scalamock"    % "6.2.0"      % Test
     )
 
   val domainLibraryDependencies: Setting[Seq[ModuleID]] =
