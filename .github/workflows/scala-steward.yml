@@ -9,6 +9,9 @@ jobs:
   scala-steward:
     runs-on: ubuntu-latest
     name: Scala Steward
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - name: Launch Scala Steward
         uses: scala-steward-org/scala-steward-action@v2
