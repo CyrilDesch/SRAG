@@ -10,7 +10,7 @@ object Dependencies {
     val logback     = "1.5.32"
     val minio       = "8.6.0"
     val okhttpJvm   = "5.1.0"
-    val okioJvm     = "3.15.0"
+    val okioJvm     = "3.16.4"
     val postgresql  = "42.7.10"
     val quill       = "4.8.6"
     val slf4j       = "2.0.17"
