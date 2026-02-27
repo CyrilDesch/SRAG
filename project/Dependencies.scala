@@ -8,7 +8,7 @@ object Dependencies {
     val flywaydb    = "11.8.2"
     val langchain4j = "0.29.1"
     val logback     = "1.5.32"
-    val minio       = "8.5.17"
+    val minio       = "8.6.0"
     val postgresql  = "42.7.10"
     val quill       = "4.8.6"
     val slf4j       = "2.0.17"
