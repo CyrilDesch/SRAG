@@ -14,7 +14,7 @@ inThisBuild(
     scalaVersion := scala3,
     dependencyOverrides ++= Seq(
       "org.scala-lang" %% "scala3-library" % scala3,
-      "dev.zio"        %% "zio-json"       % "0.7.45"
+      "dev.zio"        %% "zio-json"       % "0.9.0"
     ),
     semanticdbEnabled := true,
     semanticdbVersion := scalafixSemanticdb.revision,
