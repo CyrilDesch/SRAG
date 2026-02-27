@@ -9,7 +9,7 @@ object Dependencies {
     val langchain4j = "1.11.0"
     val logback     = "1.5.32"
     val minio       = "8.6.0"
-    val okhttpJvm   = "5.1.0"
+    val okhttpJvm   = "5.3.2"
     val okioJvm     = "3.15.0"
     val postgresql  = "42.7.10"
     val quill       = "4.8.6"
