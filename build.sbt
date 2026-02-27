@@ -5,7 +5,7 @@ import Dependencies.{
   testingLibraryDependencies
 }
 
-val scala3 = "3.7.4"
+val scala3 = "3.8.2"
 
 name := "com.cyrelis.srag"
 
@@ -13,8 +13,9 @@ inThisBuild(
   List(
     scalaVersion := scala3,
     dependencyOverrides ++= Seq(
-      "org.scala-lang" %% "scala3-library" % scala3,
-      "dev.zio"        %% "zio-json"       % "0.7.45"
+      "org.scala-lang"      %% "scala3-library" % scala3,
+      "dev.zio"             %% "zio-json"       % "0.9.0",
+      "com.squareup.okhttp3" % "okhttp"         % "4.12.0"
     ),
     semanticdbEnabled := true,
     semanticdbVersion := scalafixSemanticdb.revision,

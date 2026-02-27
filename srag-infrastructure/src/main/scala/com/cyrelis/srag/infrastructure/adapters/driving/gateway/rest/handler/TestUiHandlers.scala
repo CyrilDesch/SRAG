@@ -9,30 +9,6 @@ import zio.*
 
 object TestUiHandlers {
 
-  private final case class VectorListItem(
-    id: String,
-    transcriptId: Option[String],
-    segmentIndex: Option[Int],
-    vector: Option[List[Float]],
-    payload: Option[Map[String, String]]
-  )
-
-  private final case class BlobListItem(
-    key: String,
-    filename: Option[String],
-    contentType: Option[String],
-    size: Option[Long],
-    created: Option[String]
-  )
-
-  private final case class OpenSearchDocumentItem(
-    id: String,
-    transcriptId: Option[String],
-    segmentIndex: Option[Int],
-    text: Option[String],
-    metadata: Option[Map[String, String]]
-  )
-
   def handleListAllJobs: ZIO[IngestionJobRepository[[X] =>> ZIO[Any, PipelineError, X]], String, List[AdminJobDto]] =
     ZIO
       .serviceWithZIO[IngestionJobRepository[[X] =>> ZIO[Any, PipelineError, X]]](_.listAll())

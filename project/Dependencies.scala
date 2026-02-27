@@ -5,15 +5,15 @@ object Dependencies {
   object Versions {
     val auth0       = "4.5.1"
     val circe       = "0.14.15"
-    val flywaydb    = "11.8.2"
-    val langchain4j = "0.29.1"
+    val flywaydb    = "11.20.3"
+    val langchain4j = "0.36.2"
     val logback     = "1.5.32"
-    val minio       = "8.5.17"
+    val minio       = "8.6.0"
     val postgresql  = "42.7.10"
     val quill       = "4.8.6"
     val slf4j       = "2.0.17"
     val sttp        = "4.0.19"
-    val tapir       = "1.11.50"
+    val tapir       = "1.13.9"
     val zio         = "2.1.24"
     val zioConfig   = "4.0.6"
     val zioLogging  = "2.5.3"
@@ -48,7 +48,7 @@ object Dependencies {
   )
 
   private val redisDependencies = Seq(
-    "redis.clients" % "jedis" % "5.1.5"
+    "redis.clients" % "jedis" % "5.2.0"
   )
 
   private val minioDependencies = Seq(
@@ -67,7 +67,7 @@ object Dependencies {
     libraryDependencies ++= Seq(
       "dev.zio"       %% "zio-test"     % Versions.zio % Test,
       "dev.zio"       %% "zio-test-sbt" % Versions.zio % Test,
-      "org.scalamock" %% "scalamock"    % "6.2.0"      % Test
+      "org.scalamock" %% "scalamock"    % "7.5.5"      % Test
     )
 
   val domainLibraryDependencies: Setting[Seq[ModuleID]] =

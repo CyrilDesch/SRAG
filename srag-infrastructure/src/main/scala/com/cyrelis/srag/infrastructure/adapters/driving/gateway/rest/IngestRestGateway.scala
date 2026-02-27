@@ -27,10 +27,11 @@ import com.cyrelis.srag.infrastructure.adapters.driving.gateway.rest.handler.{
   TestHandlers,
   TestUiHandlers
 }
+import sttp.capabilities.zio.ZioStreams
 import sttp.tapir.server.ziohttp.ZioHttpInterpreter
 import sttp.tapir.swagger.SwaggerUIOptions
 import sttp.tapir.swagger.bundle.SwaggerInterpreter
-import sttp.tapir.ztapir.RichZEndpoint
+import sttp.tapir.ztapir.{RichZEndpoint, ZServerEndpoint}
 import zio.*
 import zio.http.*
 
@@ -43,6 +44,9 @@ final class IngestRestGateway(
   type TestEnv = TranscriberPort & EmbedderPort & BlobStorePort &
     TranscriptRepository[[X] =>> ZIO[Any, PipelineError, X]] & VectorStorePort & LexicalStorePort & RerankerPort &
     IngestionJobRepository[[X] =>> ZIO[Any, PipelineError, X]]
+
+  private def toHttpRoutes(endpoints: List[ZServerEndpoint[Any, ZioStreams]]): Routes[Any, Response] =
+    ZioHttpInterpreter().toHttp(endpoints)
 
   private def buildRoutes
     : ZIO[IngestService & HealthCheckService & QueryService & TestEnv, Nothing, Routes[Any, Response]] =
@@ -66,7 +70,7 @@ final class IngestRestGateway(
       queryPort       <- ZIO.service[QueryService]
       blobStore       <- ZIO.service[BlobStorePort]
       transcriptRepo  <- ZIO.service[TranscriptRepository[[X] =>> ZIO[Any, PipelineError, X]]]
-    } yield ZioHttpInterpreter().toHttp(
+    } yield toHttpRoutes(
       List(
         MainEndpoints.health.zServerLogic(_ => MainHandlers.handleHealth.provide(ZLayer.succeed(healthCheckPort))),
         MainEndpoints.ingestAudioMultipart.zServerLogic(
@@ -112,7 +116,7 @@ final class IngestRestGateway(
       vectorSink   <- ZIO.service[VectorStorePort]
       lexicalStore <- ZIO.service[LexicalStorePort]
       reranker     <- ZIO.service[RerankerPort]
-    } yield ZioHttpInterpreter().toHttp(
+    } yield toHttpRoutes(
       List(
         TestEndpoints.testTranscriber.zServerLogic(
           TestHandlers.handleTranscriber(_).provide(ZLayer.succeed(transcriber))
@@ -147,7 +151,7 @@ final class IngestRestGateway(
       vectorStore  <- ZIO.service[VectorStorePort]
       blobStore    <- ZIO.service[BlobStorePort]
       lexicalStore <- ZIO.service[LexicalStorePort]
-    } yield ZioHttpInterpreter().toHttp(
+    } yield toHttpRoutes(
       List(
         TestUiEndpoints.listAllJobs.zServerLogic(_ =>
           TestUiHandlers.handleListAllJobs.provide(ZLayer.succeed(jobRepo))
