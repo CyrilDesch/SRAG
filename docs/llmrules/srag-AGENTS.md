@@ -12,10 +12,18 @@ description: Always-applied SRAG Scala 3 + ZIO development rules and engineering
 - Keep business logic pure and isolate side effects.
 - Always compile and run tests after every code change.
 
+## AI Agent Behavioral Rules
+
+- **Think Step-by-Step:** Always plan step-by-step before writing or modifying code.
+- **Verify Before Modifying:** Never assume the state of the codebase. Read the current implementation before making changes.
+- **Incremental Execution:** Make small, isolated changes and verify them before moving on.
+- **Fail Fast on Uncertainty:** If requirements are ambiguous or conflict with architectural rules, STOP and ask for clarification. Do not guess.
+
 ## Other rules
 
 - `.llmrules/srag-architecture.md` (On-demand SRAG architecture rules covering module boundaries, ports/adapters, and wiring workflow)
 - `.llmrules/srag-context.md` (On-demand project context for SRAG product scope, runtime setup, and delivery constraints)
+- **NEVER** commit and push code. Do not use `git commit` or `git push` under any circumstances.
 
 ## Security and Reliability Baseline
 
