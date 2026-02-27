@@ -17,7 +17,7 @@ object Dependencies {
     val zio         = "2.1.17"
     val zioConfig   = "4.0.2"
     val zioLogging  = "2.2.4"
-    val zioPrelude  = "1.0.0-RC36"
+    val zioPrelude  = "1.0.0-RC46"
   }
 
   private val zioCoreDependencies = Seq(
