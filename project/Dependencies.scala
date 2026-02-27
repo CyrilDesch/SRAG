@@ -48,7 +48,7 @@ object Dependencies {
   )
 
   private val redisDependencies = Seq(
-    "redis.clients" % "jedis" % "5.2.0"
+    "redis.clients" % "jedis" % "7.3.0"
   )
 
   private val minioDependencies = Seq(
