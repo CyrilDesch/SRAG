@@ -9,6 +9,8 @@ object Dependencies {
     val langchain4j = "1.11.0"
     val logback     = "1.5.32"
     val minio       = "8.6.0"
+    val okhttpJvm   = "5.1.0"
+    val okioJvm     = "3.15.0"
     val postgresql  = "42.7.10"
     val quill       = "4.8.6"
     val slf4j       = "2.0.17"
@@ -55,6 +57,11 @@ object Dependencies {
     "io.minio" % "minio" % Versions.minio
   )
 
+  private val okhttpJvmDependencies = Seq(
+    "com.squareup.okhttp3" % "okhttp-jvm" % Versions.okhttpJvm,
+    "com.squareup.okio"    % "okio-jvm"   % Versions.okioJvm
+  )
+
   private val jwtDependencies = Seq(
     "com.auth0" % "java-jwt" % Versions.auth0
   )
@@ -89,6 +96,7 @@ object Dependencies {
         quillDependencies ++
         redisDependencies ++
         minioDependencies ++
+        okhttpJvmDependencies ++
         langchain4jDependencies ++ Seq(
           "com.softwaremill.sttp.client4" %% "core"                     % Versions.sttp,
           "com.softwaremill.sttp.client4" %% "zio"                      % Versions.sttp,

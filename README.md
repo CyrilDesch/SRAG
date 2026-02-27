@@ -59,6 +59,7 @@ All services are ready to use with **no configuration needed**.
 ### 3. Compile the project
 
 ```bash
+sbt bloopInstall
 sbt compile
 ```
 

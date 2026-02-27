@@ -11,23 +11,16 @@ name := "com.cyrelis.srag"
 
 inThisBuild(
   List(
-    scalaVersion := scala3,
-    dependencyOverrides ++= Seq(
-      "org.scala-lang"      %% "scala3-library" % scala3,
-      "dev.zio"             %% "zio-json"       % "0.9.0",
-      "com.squareup.okhttp3" % "okhttp"         % "5.3.2"
-    ),
+    scalaVersion      := scala3,
     semanticdbEnabled := true,
     semanticdbVersion := scalafixSemanticdb.revision,
     scalacOptions ++= Seq(
       "-deprecation",
       "-feature",
       "-Wunused:all"
-//      "-Xfatal-warnings"
     ),
     run / fork := true,
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
-    // Help Metals index Java libraries by ensuring proper classpath export
     exportJars := true
   )
 )
@@ -94,8 +87,7 @@ lazy val dockerSettings = {
     dockerRepository        := Some("ghcr.io"),
     dockerUpdateLatest      := true,
     dockerExposedPorts      := Seq(8000),
-    // Use a simple tag format without version to avoid invalid characters
-    Docker / version := "latest"
+    Docker / version        := "latest"
   )
 }
 
@@ -115,7 +107,6 @@ lazy val assemblySettings = {
         val oldStrategy = (assembly / assemblyMergeStrategy).value
         oldStrategy(x)
     },
-    // Exclude unnecessary files to reduce JAR size
     assembly / assemblyExcludedJars := {
       val cp = (assembly / fullClasspath).value
       cp.filter { file =>
