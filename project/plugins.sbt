@@ -11,6 +11,6 @@ addSbtPlugin("io.spray" % "sbt-revolver" % "0.10.0")
 // Giter8 support
 addSbtPlugin("org.foundweekends.giter8" % "sbt-giter8-scaffold" % "0.18.0")
 // Scalafix
-addSbtPlugin("ch.epfl.scala" % "sbt-scalafix" % "0.14.3")
+addSbtPlugin("ch.epfl.scala" % "sbt-scalafix" % "0.14.6")
 // Bloop for Metals support
 addSbtPlugin("ch.epfl.scala" % "sbt-bloop" % "2.0.18")
