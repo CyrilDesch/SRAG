@@ -1,0 +1,87 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "dev",
+      "dependsOrder": "sequence",
+      "dependsOn": ["setup", "start-dev"],
+      "problemMatcher": [],
+      "group": {
+        "kind": "build"
+      }
+    },
+    {
+      "label": "setup",
+      "type": "shell",
+      "command": "./scripts/setup.sh",
+      "presentation": {
+        "panel": "dedicated",
+        "group": "runDevCmd",
+        "close": true
+      },
+      "group": "build"
+    },
+    {
+      "label": "start-docker",
+      "icon": {
+        "id": "database"
+      },
+      "type": "shell",
+      "command": "docker compose up -d --wait",
+      "presentation": {
+        "panel": "dedicated",
+        "group": "runDevCmd",
+        "close": true
+      },
+      "group": "build",
+      "isBackground": false
+    },
+    {
+      "label": "start-dev",
+      "dependsOrder": "sequence",
+      "dependsOn": ["start-docker", "start-watchers"],
+      "problemMatcher": [],
+      "group": {
+        "kind": "build"
+      }
+    },
+    {
+      "label": "start-watchers",
+      "dependsOrder": "parallel",
+      "dependsOn": ["start-server", "watch-docker"],
+      "problemMatcher": [],
+      "group": {
+        "kind": "build"
+      }
+    },
+    {
+      "label": "start-server",
+      "icon": {
+        "id": "server-process"
+      },
+      "type": "shell",
+      "command": "./scripts/hotServerRun.sh",
+      "presentation": {
+        "panel": "dedicated",
+        "group": "back",
+        "reveal": "always"
+      },
+      "group": "build"
+    },
+    {
+      "label": "watch-docker",
+      "icon": {
+        "id": "eye"
+      },
+      "type": "shell",
+      "command": "./scripts/dockerWatch.sh",
+      "presentation": {
+        "panel": "dedicated",
+        "group": "back",
+        "reveal": "always"
+      },
+      "group": "build",
+      "isBackground": false
+    }
+  ]
+}

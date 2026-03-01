@@ -1,0 +1,40 @@
+{
+  "files.exclude": {
+    "**/.bloop": true,
+    "**/.bsp": true,
+    "**/.metals": true,
+    "**/target": true,
+    "**/.scala-build": true,
+    "**/.ammonite": true,
+    "**/.sbt": true
+  },
+  "search.exclude": {
+    "**/.bloop": true,
+    "**/.bsp": true,
+    "**/.metals": true,
+    "**/target": true,
+    "**/.scala-build": true,
+    "**/.ammonite": true,
+    "**/.sbt": true
+  },
+  "files.watcherExclude": {
+    "**/.bloop/**": true,
+    "**/.bsp/**": true,
+    "**/.metals/**": true,
+    "**/target/**": true,
+    "**/.scala-build/**": true,
+    "**/.ammonite/**": true,
+    "**/.sbt/**": true,
+    "**/target": true
+  },
+  "editor.formatOnSave": true,
+  "[scala]": {
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit",
+      "source.fixAll": "explicit"
+    }
+  },
+  "metals.inlayHints.implicitConversions.enable": false,
+  "metals.inlayHints.inferredTypes.enable": false
+}
