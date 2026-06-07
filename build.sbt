@@ -5,7 +5,7 @@ import Dependencies.{
   testingLibraryDependencies
 }
 
-val scala3 = "3.8.2"
+val scala3 = "3.8.4"
 
 name := "com.cyrelis.srag"
 
