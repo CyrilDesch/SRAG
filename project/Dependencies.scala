@@ -7,7 +7,7 @@ object Dependencies {
     val circe       = "0.14.15"
     val flywaydb    = "12.0.3"
     val langchain4j = "1.11.0"
-    val logback     = "1.5.32"
+    val logback     = "1.5.37"
     val minio       = "8.6.0"
     val okhttpJvm   = "5.3.2"
     val okioJvm     = "3.16.4"
