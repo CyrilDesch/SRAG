@@ -11,7 +11,7 @@ object Dependencies {
     val minio       = "8.6.0"
     val okhttpJvm   = "5.3.2"
     val okioJvm     = "3.16.4"
-    val postgresql  = "42.7.10"
+    val postgresql  = "42.7.13"
     val quill       = "4.8.6"
     val slf4j       = "2.0.17"
     val sttp        = "4.0.19"
